@@ -1,43 +1,39 @@
-// Firebase 初始化模組（Task 002 模板 → Task 003 實際串接）
-//
-// 本檔案提供 Firebase config 解析框架。實際的 initializeApp / Firestore /
-// Auth / Storage 初始化將在 Task 003 加入。
-//
-// 環境變數請參考根目錄 `.env.example`。
+// Firebase 初始化（Task 003）
+// Project ID: ithink-sams
 
-interface FirebaseEnvConfig {
-  apiKey: string;
-  authDomain: string;
-  projectId: string;
-  storageBucket: string;
-  messagingSenderId: string;
-  appId: string;
+import { initializeApp, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getStorage, type FirebaseStorage } from 'firebase/storage';
+import { getAnalytics, isSupported as isAnalyticsSupported, type Analytics } from 'firebase/analytics';
+
+const firebaseConfig = {
+  apiKey: 'AIzaSyDhkUU_bai8EkNZ-40jSiNChYKkQESyROg',
+  authDomain: 'ithink-sams.firebaseapp.com',
+  projectId: 'ithink-sams',
+  storageBucket: 'ithink-sams.firebasestorage.app',
+  messagingSenderId: '173406480654',
+  appId: '1:173406480654:web:c2cee2b3c7b0ef10a80f5f',
+  measurementId: 'G-5ZXXHFBFDK',
+};
+
+export const app: FirebaseApp = initializeApp(firebaseConfig);
+export const auth: Auth = getAuth(app);
+export const db: Firestore = getFirestore(app);
+export const storage: FirebaseStorage = getStorage(app);
+
+// Analytics 僅在支援的瀏覽器環境啟用（避免 SSR / 測試環境噴錯）
+export let analytics: Analytics | null = null;
+if (typeof window !== 'undefined') {
+  isAnalyticsSupported()
+    .then((supported) => {
+      if (supported) {
+        analytics = getAnalytics(app);
+      }
+    })
+    .catch(() => {
+      analytics = null;
+    });
 }
 
-function readFirebaseEnv(): FirebaseEnvConfig {
-  const env = import.meta.env;
-  const config: FirebaseEnvConfig = {
-    apiKey: env.VITE_FIREBASE_API_KEY,
-    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: env.VITE_FIREBASE_APP_ID,
-  };
-
-  const missing = (Object.keys(config) as Array<keyof FirebaseEnvConfig>)
-    .filter((key) => !config[key]);
-
-  if (missing.length > 0) {
-    throw new Error(
-      `[SAMS] 缺少 Firebase 環境變數：${missing
-        .map((k) => `VITE_FIREBASE_${k.replace(/[A-Z]/g, (c) => `_${c}`).toUpperCase()}`)
-        .join(', ')}\n` +
-        '請參考 .env.example 建立 .env',
-    );
-  }
-
-  return config;
-}
-
-export const firebaseConfig = readFirebaseEnv;
+export const PROJECT_ID = firebaseConfig.projectId;
