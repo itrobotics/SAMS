@@ -58,7 +58,7 @@ export function subscribeAttendanceForBranchDate(
 ): Unsubscribe {
   // attendance_records 沒有 date 欄位，但 sessionId 以 YYYYMMDD 開頭。
   // 改用 branchId + sessionId range query：sessionId 範圍 [YYYYMMDD_, YYYYMMDD`]
-  const compact = date.replaceAll('-', '');
+  const compact = date.split('-').join('');
   const startId = `${compact}_`;
   const endId = `${compact}` + '`'; // ASCII '`' 在 '_' 之後
   const q = query(
