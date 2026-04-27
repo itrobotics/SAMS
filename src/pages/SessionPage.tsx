@@ -10,7 +10,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
-import { subscribeAttendanceForSession } from '../services/attendance';
+import { subscribeAttendanceForSession, updateAttendance } from '../services/attendance';
 import { subscribeSession } from '../services/sessions';
 import { ROUTES } from '../routes/paths';
 import { formatTimeWithSec } from '../utils/date';
@@ -30,6 +30,28 @@ export function SessionPage() {
   const [session, setSession] = useState<SessionDoc | null | 'missing'>(null);
   const [records, setRecords] = useState<AttendanceRecordDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  // 手動報到：依目標狀態決定是否寫入 checkinTime / method=MANUAL。
+  // 遲到判斷邏輯（Task 027）會接在 handleCheckIn 內，依 graceMinutes 決定 status。
+  async function setStatus(record: AttendanceRecordDoc, target: AttendanceStatus) {
+    setBusyId(record.recordId);
+    try {
+      const isPresent = target === 'CHECKED_IN' || target === 'LATE';
+      await updateAttendance(record.recordId, {
+        status: target,
+        method: isPresent ? 'MANUAL' : null,
+        confidence: null,
+        operatorId: user?.userId ?? null,
+        setCheckinNow: isPresent,
+        clearCheckin: !isPresent,
+      });
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '操作失敗');
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   useEffect(() => {
     if (!sessionId) return;
@@ -135,9 +157,11 @@ export function SessionPage() {
                 </td>
                 <td style={styles.td}>{methodLabel(r.method)}</td>
                 <td style={styles.td}>
-                  <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>
-                    操作按鈕於 Task 026 加入
-                  </span>
+                  <ActionButtons
+                    record={r}
+                    busy={busyId === r.recordId}
+                    onSet={setStatus}
+                  />
                 </td>
               </tr>
             ))}
@@ -145,6 +169,77 @@ export function SessionPage() {
         </table>
       </div>
     </section>
+  );
+}
+
+function ActionButtons({
+  record, busy, onSet,
+}: {
+  record: AttendanceRecordDoc;
+  busy: boolean;
+  onSet: (r: AttendanceRecordDoc, s: AttendanceStatus) => Promise<void>;
+}) {
+  const isPresent = record.status === 'CHECKED_IN' || record.status === 'LATE';
+  const isLeave = record.status === 'LEAVE';
+  const isAbsent = record.status === 'ABSENT';
+
+  return (
+    <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+      <ActionBtn
+        label="已到"
+        active={isPresent}
+        accent="#166534"
+        disabled={busy}
+        onClick={() => onSet(record, 'CHECKED_IN')}
+      />
+      <ActionBtn
+        label="請假"
+        active={isLeave}
+        accent="#1e40af"
+        disabled={busy}
+        onClick={() => onSet(record, 'LEAVE')}
+      />
+      <ActionBtn
+        label="未到"
+        active={isAbsent}
+        accent="#b91c1c"
+        disabled={busy}
+        onClick={() => onSet(record, 'ABSENT')}
+      />
+      <ActionBtn
+        label="重設"
+        active={false}
+        accent="#6b7280"
+        disabled={busy || record.status === 'SCHEDULED'}
+        onClick={() => onSet(record, 'SCHEDULED')}
+      />
+    </div>
+  );
+}
+
+function ActionBtn({
+  label, active, accent, disabled, onClick,
+}: {
+  label: string; active: boolean; accent: string; disabled: boolean; onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: '0.25rem 0.6rem',
+        fontSize: '0.85rem',
+        borderRadius: 6,
+        border: `1px solid ${active ? accent : '#d1d5db'}`,
+        background: active ? accent : '#fff',
+        color: active ? '#fff' : accent,
+        opacity: disabled ? 0.55 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+      }}
+    >
+      {label}
+    </button>
   );
 }
 
