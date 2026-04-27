@@ -10,6 +10,7 @@ import { ClassesPage } from '../pages/ClassesPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
+import { AuthGuard } from './AuthGuard';
 import { ROUTES } from './paths';
 
 export function AppRouter() {
@@ -18,13 +19,64 @@ export function AppRouter() {
       <Routes>
         <Route path="/" element={<Navigate to={ROUTES.login} replace />} />
         <Route path={ROUTES.login} element={<LoginPage />} />
-        <Route path={ROUTES.hqDashboard} element={<HQDashboardPage />} />
-        <Route path={ROUTES.branchDashboard()} element={<BranchDashboardPage />} />
-        <Route path={ROUTES.session()} element={<SessionPage />} />
-        <Route path={ROUTES.kiosk()} element={<KioskPage />} />
-        <Route path={ROUTES.students} element={<StudentsPage />} />
-        <Route path={ROUTES.classes} element={<ClassesPage />} />
-        <Route path={ROUTES.settings} element={<SettingsPage />} />
+
+        <Route
+          path={ROUTES.hqDashboard}
+          element={
+            <AuthGuard>
+              <HQDashboardPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.branchDashboard()}
+          element={
+            <AuthGuard>
+              <BranchDashboardPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.session()}
+          element={
+            <AuthGuard>
+              <SessionPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.kiosk()}
+          element={
+            <AuthGuard>
+              <KioskPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.students}
+          element={
+            <AuthGuard>
+              <StudentsPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.classes}
+          element={
+            <AuthGuard>
+              <ClassesPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.settings}
+          element={
+            <AuthGuard>
+              <SettingsPage />
+            </AuthGuard>
+          }
+        />
+
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
