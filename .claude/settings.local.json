@@ -4,7 +4,9 @@
       "Bash(npm --version)",
       "Bash(npm install *)",
       "Bash(npx tsc *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git rm *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
