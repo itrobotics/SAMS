@@ -12,9 +12,12 @@ import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { subscribeAttendanceForSession, updateAttendance } from '../services/attendance';
 import { subscribeSession } from '../services/sessions';
+import { subscribeBranchSettings } from '../services/settings';
 import { ROUTES } from '../routes/paths';
+import { decideManualCheckinStatus } from '../utils/attendance';
 import { formatTimeWithSec } from '../utils/date';
 import { canAccessBranch } from '../types/user';
+import { DEFAULT_BRANCH_SETTINGS, type BranchSettings } from '../types/settings';
 import {
   STATUS_COLORS,
   STATUS_LABELS,
@@ -31,15 +34,35 @@ export function SessionPage() {
   const [records, setRecords] = useState<AttendanceRecordDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [settings, setSettings] = useState<BranchSettings | null>(null);
 
-  // 手動報到：依目標狀態決定是否寫入 checkinTime / method=MANUAL。
-  // 遲到判斷邏輯（Task 027）會接在 handleCheckIn 內，依 graceMinutes 決定 status。
+  // 訂閱該分校設定（取 graceMinutes）
+  useEffect(() => {
+    const branchId = session && session !== 'missing' ? session.branchId : null;
+    if (!branchId) return;
+    const unsub = subscribeBranchSettings(branchId, setSettings);
+    return unsub;
+  }, [session]);
+
+  // 手動報到：
+  //   target='CHECKED_IN' → 依 graceMinutes 自動分流為 CHECKED_IN 或 LATE
+  //   其他狀態維持原值
   async function setStatus(record: AttendanceRecordDoc, target: AttendanceStatus) {
     setBusyId(record.recordId);
     try {
-      const isPresent = target === 'CHECKED_IN' || target === 'LATE';
+      let finalStatus: AttendanceStatus = target;
+      if (target === 'CHECKED_IN' && session && session !== 'missing') {
+        const grace = settings?.graceMinutes ?? DEFAULT_BRANCH_SETTINGS.graceMinutes;
+        finalStatus = decideManualCheckinStatus(
+          new Date(),
+          session.date,
+          session.startTime,
+          grace,
+        );
+      }
+      const isPresent = finalStatus === 'CHECKED_IN' || finalStatus === 'LATE';
       await updateAttendance(record.recordId, {
-        status: target,
+        status: finalStatus,
         method: isPresent ? 'MANUAL' : null,
         confidence: null,
         operatorId: user?.userId ?? null,
@@ -110,6 +133,9 @@ export function SessionPage() {
             {session.classroom ? ` · 教室 ${session.classroom}` : ''}
             {session.teacherId ? ` · 老師 ${session.teacherId}` : ''}
             {' · '}<code>{session.sessionId}</code>
+          </p>
+          <p style={styles.graceNote}>
+            遲到判定：上課後 {settings?.graceMinutes ?? DEFAULT_BRANCH_SETTINGS.graceMinutes} 分鐘起算
           </p>
         </div>
       </header>
@@ -273,6 +299,7 @@ const styles: Record<string, React.CSSProperties> = {
   back: { color: '#6b7280', fontSize: '0.9rem', display: 'inline-block', marginBottom: '0.5rem' },
   title: { margin: 0, fontSize: '1.5rem' },
   subtitle: { margin: '0.4rem 0 0', color: '#6b7280', fontSize: '0.9rem' },
+  graceNote: { margin: '0.2rem 0 0', color: '#9ca3af', fontSize: '0.8rem' },
   error: {
     padding: '0.6rem 0.75rem', background: '#fef2f2', color: '#b91c1c',
     border: '1px solid #fecaca', borderRadius: 6, marginBottom: '1rem',
