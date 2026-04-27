@@ -3,6 +3,7 @@
 export const ROUTES = {
   login: '/login',
   hqDashboard: '/hq-dashboard',
+  branches: '/branches',
   branchDashboard: (branchId = ':branchId') => `/branch-dashboard/${branchId}`,
   session: (sessionId = ':sessionId') => `/session/${sessionId}`,
   kiosk: (branchId = ':branchId') => `/kiosk/${branchId}`,

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { LoginPage } from '../pages/LoginPage';
 import { HQDashboardPage } from '../pages/HQDashboardPage';
+import { BranchesPage } from '../pages/BranchesPage';
 import { BranchDashboardPage } from '../pages/BranchDashboardPage';
 import { SessionPage } from '../pages/SessionPage';
 import { KioskPage } from '../pages/KioskPage';
@@ -25,6 +26,14 @@ export function AppRouter() {
           element={
             <AuthGuard>
               <HQDashboardPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.branches}
+          element={
+            <AuthGuard>
+              <BranchesPage />
             </AuthGuard>
           }
         />
