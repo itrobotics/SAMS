@@ -12,8 +12,10 @@ import { StudentFormDialog } from '../components/StudentFormDialog';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { db } from '../services/firebase';
+import { subscribeStudentClasses } from '../services/classStudents';
 import { canAccessBranch } from '../types/user';
 import { STUDENTS_COLLECTION, type StudentDoc } from '../types/student';
+import type { ClassStudentDoc } from '../types/classStudent';
 
 export function StudentDetailPage() {
   const { studentId } = useParams<{ studentId: string }>();
@@ -22,6 +24,7 @@ export function StudentDetailPage() {
   const [student, setStudent] = useState<StudentDoc | null | 'missing'>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [enrollments, setEnrollments] = useState<ClassStudentDoc[]>([]);
 
   useEffect(() => {
     if (!studentId) return;
@@ -34,6 +37,12 @@ export function StudentDetailPage() {
       }
       setLoading(false);
     });
+    return unsub;
+  }, [studentId]);
+
+  useEffect(() => {
+    if (!studentId) return;
+    const unsub = subscribeStudentClasses(studentId, setEnrollments);
     return unsub;
   }, [studentId]);
 
@@ -96,9 +105,22 @@ export function StudentDetailPage() {
 
         <article style={styles.card}>
           <h2 style={styles.h2}>所屬班級</h2>
-          <p style={styles.placeholder}>
-            班級關聯資料（class_students）將於 Phase 4 / Task 016 後顯示。
-          </p>
+          {enrollments.length === 0 ? (
+            <p style={styles.placeholder}>尚未加入任何班級</p>
+          ) : (
+            <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
+              {enrollments.map((e) => (
+                <li key={e.id} style={{ marginBottom: '0.25rem' }}>
+                  <code>{e.classId}</code>
+                  {!e.active && (
+                    <span style={{ color: '#9ca3af', fontSize: '0.8rem', marginLeft: '0.4rem' }}>
+                      （已退出）
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </article>
 
         <article style={styles.card}>
