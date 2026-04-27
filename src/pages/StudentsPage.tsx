@@ -11,6 +11,7 @@ import { StudentFormDialog } from '../components/StudentFormDialog';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { setStudentActive, subscribeStudents } from '../services/students';
+import { ROUTES } from '../routes/paths';
 import type { StudentDoc } from '../types/student';
 
 const ALL = '__all__';
@@ -177,7 +178,7 @@ export function StudentsPage() {
               <tr key={s.studentId}>
                 <td style={styles.td}><code>{s.studentId}</code></td>
                 <td style={styles.td}>
-                  <Link to={`/students/${s.studentId}`}>{s.name}</Link>
+                  <Link to={ROUTES.studentDetail(s.studentId)}>{s.name}</Link>
                 </td>
                 <td style={styles.td}>{s.grade || '—'}</td>
                 <td style={styles.td}>{branchName(s.branchId)}</td>

@@ -8,6 +8,7 @@ export const ROUTES = {
   session: (sessionId = ':sessionId') => `/session/${sessionId}`,
   kiosk: (branchId = ':branchId') => `/kiosk/${branchId}`,
   students: '/students',
+  studentDetail: (studentId = ':studentId') => `/students/${studentId}`,
   classes: '/classes',
   settings: '/settings',
 } as const;
