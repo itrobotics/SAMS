@@ -9,6 +9,7 @@ import { KioskPage } from '../pages/KioskPage';
 import { StudentsPage } from '../pages/StudentsPage';
 import { StudentDetailPage } from '../pages/StudentDetailPage';
 import { ClassesPage } from '../pages/ClassesPage';
+import { ClassDetailPage } from '../pages/ClassDetailPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
@@ -83,6 +84,14 @@ export function AppRouter() {
           element={
             <AuthGuard>
               <ClassesPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.classDetail()}
+          element={
+            <AuthGuard>
+              <ClassDetailPage />
             </AuthGuard>
           }
         />
