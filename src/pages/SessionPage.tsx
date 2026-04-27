@@ -10,8 +10,11 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
-import { subscribeAttendanceForSession, updateAttendance } from '../services/attendance';
-import { subscribeSession } from '../services/sessions';
+import {
+  useSessionAttendanceRealtime,
+  useSessionRealtime,
+} from '../hooks/useRealtime';
+import { updateAttendance } from '../services/attendance';
 import { subscribeBranchSettings } from '../services/settings';
 import { ROUTES } from '../routes/paths';
 import { decideManualCheckinStatus } from '../utils/attendance';
@@ -24,21 +27,23 @@ import {
   type AttendanceRecordDoc,
   type AttendanceStatus,
 } from '../types/attendance';
-import type { SessionDoc } from '../types/session';
 
 export function SessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { user } = useAuth();
   const { branches } = useBranches();
-  const [session, setSession] = useState<SessionDoc | null | 'missing'>(null);
-  const [records, setRecords] = useState<AttendanceRecordDoc[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const sessionRT = useSessionRealtime(sessionId);
+  const recordsRT = useSessionAttendanceRealtime(sessionId);
+  const session = sessionRT.data;
+  const records = recordsRT.data;
+  const error = sessionRT.error ?? recordsRT.error;
+  const sessionLoading = sessionRT.loading;
   const [busyId, setBusyId] = useState<string | null>(null);
   const [settings, setSettings] = useState<BranchSettings | null>(null);
 
   // 訂閱該分校設定（取 graceMinutes）
   useEffect(() => {
-    const branchId = session && session !== 'missing' ? session.branchId : null;
+    const branchId = session ? session.branchId : null;
     if (!branchId) return;
     const unsub = subscribeBranchSettings(branchId, setSettings);
     return unsub;
@@ -51,7 +56,7 @@ export function SessionPage() {
     setBusyId(record.recordId);
     try {
       let finalStatus: AttendanceStatus = target;
-      if (target === 'CHECKED_IN' && session && session !== 'missing') {
+      if (target === 'CHECKED_IN' && session) {
         const grace = settings?.graceMinutes ?? DEFAULT_BRANCH_SETTINGS.graceMinutes;
         finalStatus = decideManualCheckinStatus(
           new Date(),
@@ -76,24 +81,6 @@ export function SessionPage() {
     }
   }
 
-  useEffect(() => {
-    if (!sessionId) return;
-    const unsub = subscribeSession(sessionId, (s) => {
-      setSession(s ?? 'missing');
-    }, (e) => setError(e.message));
-    return unsub;
-  }, [sessionId]);
-
-  useEffect(() => {
-    if (!sessionId) return;
-    const unsub = subscribeAttendanceForSession(
-      sessionId,
-      setRecords,
-      (e) => setError(e.message),
-    );
-    return unsub;
-  }, [sessionId]);
-
   const counts = useMemo(() => {
     const acc: Record<AttendanceStatus, number> = {
       SCHEDULED: 0, CHECKED_IN: 0, LATE: 0, LEAVE: 0, ABSENT: 0, MAKEUP: 0, CANCELLED: 0,
@@ -102,8 +89,8 @@ export function SessionPage() {
     return acc;
   }, [records]);
 
-  if (session === null) return <div style={{ color: '#6b7280' }}>載入中…</div>;
-  if (session === 'missing') {
+  if (sessionLoading) return <div style={{ color: '#6b7280' }}>載入中…</div>;
+  if (!session) {
     return (
       <section>
         <h1>找不到場次</h1>

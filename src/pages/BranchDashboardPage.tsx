@@ -6,18 +6,17 @@
 // （以 sessionId 範圍查 [YYYYMMDD_, YYYYMMDD`)）。
 // 點擊班級進入 /session/:sessionId 進行報到（Task 025）。
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { useBranches } from '../hooks/useBranches';
 import {
-  subscribeAttendanceForBranchDate,
-} from '../services/attendance';
-import { subscribeSessionsForBranchDate } from '../services/sessions';
+  useBranchDayAttendanceRealtime,
+  useBranchDaySessionsRealtime,
+} from '../hooks/useRealtime';
 import { ROUTES } from '../routes/paths';
 import { todayISO } from '../utils/date';
-import type { AttendanceRecordDoc, AttendanceStatus } from '../types/attendance';
-import type { SessionDoc } from '../types/session';
+import type { AttendanceStatus } from '../types/attendance';
 
 interface SessionStats {
   total: number;
@@ -36,31 +35,12 @@ export function BranchDashboardPage() {
   const { branchId } = useParams<{ branchId: string }>();
   const { branches } = useBranches();
   const [date, setDate] = useState<string>(todayISO());
-  const [sessions, setSessions] = useState<SessionDoc[]>([]);
-  const [records, setRecords] = useState<AttendanceRecordDoc[]>([]);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!branchId) return;
-    setError(null);
-    const unsub = subscribeSessionsForBranchDate(
-      { branchId, date },
-      setSessions,
-      (e) => setError(e.message),
-    );
-    return unsub;
-  }, [branchId, date]);
-
-  useEffect(() => {
-    if (!branchId) return;
-    const unsub = subscribeAttendanceForBranchDate(
-      branchId,
-      date,
-      setRecords,
-      (e) => setError(e.message),
-    );
-    return unsub;
-  }, [branchId, date]);
+  const sessionsRT = useBranchDaySessionsRealtime(branchId, date);
+  const recordsRT = useBranchDayAttendanceRealtime(branchId, date);
+  const sessions = sessionsRT.data;
+  const records = recordsRT.data;
+  const error = sessionsRT.error ?? recordsRT.error;
 
   const branchName = branches.find((b) => b.branchId === branchId)?.name ?? branchId;
 
