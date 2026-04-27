@@ -5,9 +5,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { ClassFormDialog } from '../components/ClassFormDialog';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
-import { subscribeClasses } from '../services/classes';
+import { setClassActive, subscribeClasses } from '../services/classes';
 import { WEEKDAY_LABELS, type ClassDoc } from '../types/class';
 
 const ALL = '__all__';
@@ -23,6 +24,24 @@ export function ClassesPage() {
   const [filterWeekday, setFilterWeekday] = useState<number | typeof ALL>(ALL);
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'disabled'>('active');
   const [filterTeacher, setFilterTeacher] = useState('');
+  const [editing, setEditing] = useState<ClassDoc | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  function openCreate() { setEditing(null); setDialogOpen(true); }
+  function openEdit(c: ClassDoc) { setEditing(c); setDialogOpen(true); }
+  async function toggleActive(c: ClassDoc) {
+    const next = !c.active;
+    if (!window.confirm(`確定要${next ? '啟用' : '停用'}班級「${c.name}」？`)) return;
+    setBusyId(c.classId);
+    try {
+      await setClassActive(c.classId, next);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '操作失敗');
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -68,7 +87,9 @@ export function ClassesPage() {
           <h1 style={styles.title}>班級管理</h1>
           <p style={styles.subtitle}>共 {visible.length} 個班級</p>
         </div>
-        {/* 「新增班級」按鈕於 Task 018 加入 */}
+        <button type="button" style={styles.primaryBtn} onClick={openCreate}>
+          ＋ 新增班級
+        </button>
       </header>
 
       <div style={styles.filterBar}>
@@ -120,14 +141,15 @@ export function ClassesPage() {
               <th style={styles.th}>上課日</th>
               <th style={styles.th}>時段</th>
               <th style={styles.th}>狀態</th>
+              <th style={styles.th}>操作</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8} style={styles.empty}>載入中…</td></tr>
+              <tr><td colSpan={9} style={styles.empty}>載入中…</td></tr>
             )}
             {!loading && visible.length === 0 && (
-              <tr><td colSpan={8} style={styles.empty}>沒有符合條件的班級</td></tr>
+              <tr><td colSpan={9} style={styles.empty}>沒有符合條件的班級</td></tr>
             )}
             {visible.map((c) => (
               <tr key={c.classId}>
@@ -145,11 +167,29 @@ export function ClassesPage() {
                     {c.active ? '啟用' : '停用'}
                   </span>
                 </td>
+                <td style={styles.td}>
+                  <button type="button" style={styles.linkBtn} onClick={() => openEdit(c)}>編輯</button>
+                  <button
+                    type="button"
+                    style={{ ...styles.linkBtn, color: c.active ? '#b91c1c' : '#166534' }}
+                    onClick={() => toggleActive(c)}
+                    disabled={busyId === c.classId}
+                  >
+                    {busyId === c.classId ? '處理中…' : c.active ? '停用' : '啟用'}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <ClassFormDialog
+        open={dialogOpen}
+        initial={editing}
+        onClose={() => setDialogOpen(false)}
+        onSaved={() => {/* realtime listener 自動更新 */}}
+      />
     </section>
   );
 }
@@ -177,4 +217,12 @@ const styles: Record<string, React.CSSProperties> = {
   empty: { padding: '2rem', textAlign: 'center', color: '#9ca3af' },
   pillActive: { padding: '0.15rem 0.55rem', borderRadius: 12, fontSize: '0.8rem', background: '#dcfce7', color: '#166534' },
   pillInactive: { padding: '0.15rem 0.55rem', borderRadius: 12, fontSize: '0.8rem', background: '#f3f4f6', color: '#6b7280' },
+  primaryBtn: {
+    padding: '0.55rem 1rem', background: '#2563eb', color: '#fff',
+    border: 'none', borderRadius: 6, fontSize: '0.95rem', fontWeight: 600,
+  },
+  linkBtn: {
+    padding: '0.2rem 0.5rem', background: 'transparent', color: '#2563eb',
+    border: 'none', fontSize: '0.9rem', marginRight: '0.25rem',
+  },
 };
