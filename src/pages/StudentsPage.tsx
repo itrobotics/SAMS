@@ -7,9 +7,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { StudentFormDialog } from '../components/StudentFormDialog';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
-import { subscribeStudents } from '../services/students';
+import { setStudentActive, subscribeStudents } from '../services/students';
 import type { StudentDoc } from '../types/student';
 
 const ALL = '__all__';
@@ -25,6 +26,30 @@ export function StudentsPage() {
   const [filterGrade, setFilterGrade] = useState<string>(ALL);
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'disabled'>('active');
   const [keyword, setKeyword] = useState('');
+  const [editing, setEditing] = useState<StudentDoc | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  function openCreate() {
+    setEditing(null);
+    setDialogOpen(true);
+  }
+  function openEdit(s: StudentDoc) {
+    setEditing(s);
+    setDialogOpen(true);
+  }
+  async function toggleActive(s: StudentDoc) {
+    const next = !s.active;
+    if (!window.confirm(`確定要${next ? '啟用' : '停用'}學生「${s.name}」？`)) return;
+    setBusyId(s.studentId);
+    try {
+      await setStudentActive(s.studentId, next);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '操作失敗');
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -81,7 +106,9 @@ export function StudentsPage() {
             共 {visible.length} 位（{filterActive === 'active' ? '啟用中' : filterActive === 'disabled' ? '已停用' : '全部狀態'}）
           </p>
         </div>
-        {/* Task 013 將加入「新增學生」按鈕 */}
+        <button type="button" style={styles.primaryBtn} onClick={openCreate}>
+          ＋ 新增學生
+        </button>
       </header>
 
       <div style={styles.filterBar}>
@@ -132,17 +159,18 @@ export function StudentsPage() {
               <th style={styles.th}>家長</th>
               <th style={styles.th}>電話</th>
               <th style={styles.th}>狀態</th>
+              <th style={styles.th}>操作</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={7} style={styles.empty}>載入中…</td>
+                <td colSpan={8} style={styles.empty}>載入中…</td>
               </tr>
             )}
             {!loading && visible.length === 0 && (
               <tr>
-                <td colSpan={7} style={styles.empty}>沒有符合條件的學生</td>
+                <td colSpan={8} style={styles.empty}>沒有符合條件的學生</td>
               </tr>
             )}
             {visible.map((s) => (
@@ -160,11 +188,32 @@ export function StudentsPage() {
                     {s.active ? '啟用' : '停用'}
                   </span>
                 </td>
+                <td style={styles.td}>
+                  <button type="button" style={styles.linkBtn} onClick={() => openEdit(s)}>
+                    編輯
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...styles.linkBtn, color: s.active ? '#b91c1c' : '#166534' }}
+                    onClick={() => toggleActive(s)}
+                    disabled={busyId === s.studentId}
+                  >
+                    {busyId === s.studentId ? '處理中…' : s.active ? '停用' : '啟用'}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <StudentFormDialog
+        open={dialogOpen}
+        initial={editing}
+        defaultBranchId={filterBranch !== ALL ? filterBranch : undefined}
+        onClose={() => setDialogOpen(false)}
+        onSaved={() => {/* realtime listener 會更新清單 */}}
+      />
     </section>
   );
 }
@@ -206,5 +255,22 @@ const styles: Record<string, React.CSSProperties> = {
   },
   pillInactive: {
     padding: '0.15rem 0.55rem', borderRadius: 12, fontSize: '0.8rem', background: '#f3f4f6', color: '#6b7280',
+  },
+  primaryBtn: {
+    padding: '0.55rem 1rem',
+    background: '#2563eb',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 6,
+    fontSize: '0.95rem',
+    fontWeight: 600,
+  },
+  linkBtn: {
+    padding: '0.2rem 0.5rem',
+    background: 'transparent',
+    color: '#2563eb',
+    border: 'none',
+    fontSize: '0.9rem',
+    marginRight: '0.25rem',
   },
 };
