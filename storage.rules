@@ -1,0 +1,30 @@
+rules_version = '2';
+
+// Firebase Storage 安全規則（Task 033）
+// 與 Firestore rules 同樣策略：登入即可讀寫，分校隔離留待後續 Phase 收緊。
+// 規格 8.Storage：照片需登入授權；僅管理角色可讀取原圖。
+// 目前 MVP 階段全部登入者皆可讀；未來在 face register / kiosk 流程穩定後
+// 再加上「僅 hq_admin / branch_admin 可讀原始照」的限制。
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // 學生人臉照：/branches/{branchId}/students/{studentId}/...
+    match /branches/{branchId}/students/{studentId}/{allPaths=**} {
+      allow read: if signedIn();
+      // 限制：只接受 image/* 且 ≤ 5 MB（避免被當免費圖床）
+      allow write: if signedIn()
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // 其他路徑全部拒絕（避免漏網的儲存路徑被濫用）
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
