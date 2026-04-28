@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { useWebcam } from './useWebcam';
 import { listActiveProfilesForStudents } from '../services/faceProfiles';
+import { logFaceAttempt, deriveDeviceId } from '../services/faceCheckinAttempts';
 import {
   extractEmbedding,
   findBestMatch,
@@ -90,6 +91,8 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 模型載入完成才開始迴圈
   const busyRef = useRef(false);
+  // 裝置 ID — 整個 component lifetime 固定一次
+  const deviceIdRef = useRef<string>(deriveDeviceId());
 
   // 1) 預先載入模型
   useEffect(() => {
@@ -167,8 +170,23 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
         ? decideVerdict(best.confidence, thresholds)
         : 'FAIL';
 
+      // Task 041 audit log：每次跑完匹配（不論結果）寫一筆
+      const logBase = {
+        branchId: args.branchId,
+        sessionId: null as string | null, // 多場次比對，留空
+        deviceId: deviceIdRef.current,
+        scopeProfileCount: profiles.length,
+        operatorId: args.operatorId,
+      };
+
       if (!best || verdict === 'FAIL') {
-        // 失敗：閃 FAILED 4 秒（KioskPage 已有 timer 自動回 READY）
+        await logFaceAttempt({
+          ...logBase,
+          matchedStudentId: best?.profile.studentId ?? null,
+          matchedStudentName: null,
+          confidence: best?.confidence ?? null,
+          result: 'FAILED',
+        });
         args.setMatch(null);
         args.setKioskState('FAILED');
         return;
@@ -188,7 +206,14 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
       };
 
       if (verdict === 'NEED_CONFIRM') {
-        // 中信心 → 切 CONFIRMING，等老師按按鈕（Task 039 wire 按鈕）
+        // 中信心 → 切 CONFIRMING，等老師按按鈕
+        await logFaceAttempt({
+          ...logBase,
+          matchedStudentId: matchInfo.studentId,
+          matchedStudentName: matchInfo.studentName,
+          confidence: matchInfo.confidence,
+          result: 'NEED_CONFIRM',
+        });
         args.setMatch(matchInfo);
         args.setKioskState('CONFIRMING');
         return;
@@ -219,6 +244,13 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
         });
       }
 
+      await logFaceAttempt({
+        ...logBase,
+        matchedStudentId: matchInfo.studentId,
+        matchedStudentName: matchInfo.studentName,
+        confidence: matchInfo.confidence,
+        result: 'SUCCESS',
+      });
       cooldownRef.current.set(best.profile.studentId, Date.now());
       args.setMatch(matchInfo);
       args.setKioskState('SUCCESS');
@@ -273,11 +305,33 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
         setCheckinNow: true,
       });
     }
+    await logFaceAttempt({
+      branchId: args.branchId,
+      sessionId: null,
+      deviceId: deviceIdRef.current,
+      matchedStudentId: m.studentId,
+      matchedStudentName: m.studentName,
+      confidence: m.confidence,
+      result: 'CONFIRMED',
+      scopeProfileCount: 0,
+      operatorId: args.operatorId,
+    });
     cooldownRef.current.set(m.studentId, Date.now());
     args.setKioskState('SUCCESS');
   }, [args]);
 
   const rejectMatch = useCallback(() => {
+    void logFaceAttempt({
+      branchId: args.branchId,
+      sessionId: null,
+      deviceId: deviceIdRef.current,
+      matchedStudentId: null,
+      matchedStudentName: null,
+      confidence: null,
+      result: 'REJECTED',
+      scopeProfileCount: 0,
+      operatorId: args.operatorId,
+    });
     args.setMatch(null);
     args.setKioskState('FAILED');
   }, [args]);

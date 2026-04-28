@@ -31,6 +31,7 @@ import {
 import { useWebcam } from '../hooks/useWebcam';
 import { ROUTES } from '../routes/paths';
 import { updateAttendance } from '../services/attendance';
+import { logFaceAttempt, deriveDeviceId } from '../services/faceCheckinAttempts';
 import { subscribeBranchSettings } from '../services/settings';
 import { decideManualCheckinStatus } from '../utils/attendance';
 import { makeRecordId } from '../types/attendance';
@@ -154,6 +155,17 @@ export function KioskPage() {
       confidence: null,
       operatorId: user?.userId ?? null,
       setCheckinNow: true,
+    });
+    void logFaceAttempt({
+      branchId: branchId ?? '',
+      sessionId: c.sessionId,
+      deviceId: deriveDeviceId(),
+      matchedStudentId: c.studentId,
+      matchedStudentName: c.studentName,
+      confidence: null,
+      result: 'MANUAL',
+      scopeProfileCount: 0,
+      operatorId: user?.userId ?? null,
     });
     setMatch({
       studentId: c.studentId,
