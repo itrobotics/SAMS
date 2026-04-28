@@ -101,6 +101,23 @@
         { "fieldPath": "studentId", "order": "ASCENDING" },
         { "fieldPath": "sessionId", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "face_profiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "studentId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "face_profiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "branchId", "order": "ASCENDING" },
+        { "fieldPath": "studentId", "order": "ASCENDING" },
+        { "fieldPath": "active", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
