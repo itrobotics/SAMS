@@ -14,6 +14,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { db } from '../services/firebase';
 import { subscribeStudentClasses } from '../services/classStudents';
+import { subscribeLeaveRequestsForStudent } from '../services/leaveRequests';
 import { canAccessBranch } from '../types/user';
 import {
   PROFILE_TYPE_LABELS,
@@ -23,6 +24,11 @@ import {
   type StudentDoc,
 } from '../types/student';
 import type { ClassStudentDoc } from '../types/classStudent';
+import {
+  LEAVE_STATUS_COLORS,
+  LEAVE_STATUS_LABELS,
+  type LeaveRequestDoc,
+} from '../types/leaveRequest';
 
 export function StudentDetailPage() {
   const { studentId } = useParams<{ studentId: string }>();
@@ -32,6 +38,7 @@ export function StudentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [enrollments, setEnrollments] = useState<ClassStudentDoc[]>([]);
+  const [leaves, setLeaves] = useState<LeaveRequestDoc[]>([]);
 
   useEffect(() => {
     if (!studentId) return;
@@ -50,6 +57,12 @@ export function StudentDetailPage() {
   useEffect(() => {
     if (!studentId) return;
     const unsub = subscribeStudentClasses(studentId, setEnrollments);
+    return unsub;
+  }, [studentId]);
+
+  useEffect(() => {
+    if (!studentId) return;
+    const unsub = subscribeLeaveRequestsForStudent(studentId, setLeaves);
     return unsub;
   }, [studentId]);
 
@@ -172,6 +185,41 @@ export function StudentDetailPage() {
           <p style={styles.placeholder}>
             出席紀錄（attendance_records）將於 Phase 5 / Task 021 後顯示。
           </p>
+        </article>
+
+        <article style={styles.card}>
+          <h2 style={styles.h2}>請假紀錄</h2>
+          {leaves.length === 0 ? (
+            <p style={styles.placeholder}>尚無請假紀錄</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {leaves.map((l) => {
+                const c = LEAVE_STATUS_COLORS[l.status];
+                return (
+                  <div
+                    key={l.leaveId}
+                    style={{
+                      padding: '0.6rem 0.75rem',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 6,
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                      <strong>{l.sessionDate}</strong>
+                      <span style={{ padding: '0.1rem 0.5rem', borderRadius: 12, fontSize: '0.75rem', background: c.bg, color: c.fg }}>
+                        {LEAVE_STATUS_LABELS[l.status]}
+                      </span>
+                    </div>
+                    <div style={{ color: '#6b7280', fontSize: '0.85rem', marginBottom: '0.2rem' }}>
+                      {l.className} · <code>{l.sessionId}</code>
+                    </div>
+                    <div style={{ color: '#374151' }}>{l.reason || '（未填原因）'}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </article>
 
         <article style={styles.card}>

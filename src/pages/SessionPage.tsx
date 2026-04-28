@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 
+import { Modal } from '../components/Modal';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import {
@@ -15,6 +16,7 @@ import {
   useSessionRealtime,
 } from '../hooks/useRealtime';
 import { updateAttendance } from '../services/attendance';
+import { createLeaveRequest } from '../services/leaveRequests';
 import { subscribeBranchSettings } from '../services/settings';
 import { ROUTES } from '../routes/paths';
 import { decideManualCheckinStatus } from '../utils/attendance';
@@ -40,6 +42,7 @@ export function SessionPage() {
   const sessionLoading = sessionRT.loading;
   const [busyId, setBusyId] = useState<string | null>(null);
   const [settings, setSettings] = useState<BranchSettings | null>(null);
+  const [leaveTarget, setLeaveTarget] = useState<AttendanceRecordDoc | null>(null);
 
   // 訂閱該分校設定（取 graceMinutes）
   useEffect(() => {
@@ -51,8 +54,13 @@ export function SessionPage() {
 
   // 手動報到：
   //   target='CHECKED_IN' → 依 graceMinutes 自動分流為 CHECKED_IN 或 LATE
+  //   target='LEAVE' → 改走請假對話框（記原因 + 建立 leave_requests 紀錄）
   //   其他狀態維持原值
   async function setStatus(record: AttendanceRecordDoc, target: AttendanceStatus) {
+    if (target === 'LEAVE') {
+      setLeaveTarget(record);
+      return;
+    }
     setBusyId(record.recordId);
     try {
       let finalStatus: AttendanceStatus = target;
@@ -76,6 +84,30 @@ export function SessionPage() {
       });
     } catch (e) {
       window.alert(e instanceof Error ? e.message : '操作失敗');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function submitLeave(reason: string) {
+    if (!leaveTarget || !session) return;
+    setBusyId(leaveTarget.recordId);
+    try {
+      await createLeaveRequest({
+        studentId: leaveTarget.studentId,
+        studentName: leaveTarget.studentName,
+        branchId: leaveTarget.branchId,
+        classId: leaveTarget.classId,
+        sessionId: leaveTarget.sessionId,
+        sessionDate: session.date,
+        className: session.className,
+        reason: reason.trim(),
+        status: 'approved',
+        operatorId: user?.userId ?? null,
+      });
+      setLeaveTarget(null);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '請假登錄失敗');
     } finally {
       setBusyId(null);
     }
@@ -181,7 +213,97 @@ export function SessionPage() {
           </tbody>
         </table>
       </div>
+
+      <LeaveDialog
+        record={leaveTarget}
+        busy={leaveTarget !== null && busyId === leaveTarget.recordId}
+        onClose={() => setLeaveTarget(null)}
+        onSubmit={submitLeave}
+      />
     </section>
+  );
+}
+
+function LeaveDialog({
+  record, busy, onClose, onSubmit,
+}: {
+  record: AttendanceRecordDoc | null;
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (reason: string) => void;
+}) {
+  const [reason, setReason] = useState('');
+
+  useEffect(() => {
+    if (record) setReason('');
+  }, [record]);
+
+  if (!record) return null;
+
+  return (
+    <Modal open={true} title={`登錄請假 — ${record.studentName}`} onClose={busy ? () => {} : onClose}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!reason.trim()) return;
+          onSubmit(reason);
+        }}
+      >
+        <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.4rem', color: '#374151' }}>
+          請假原因（必填）
+        </label>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={4}
+          placeholder="例如：感冒發燒、家庭因素…"
+          style={{
+            width: '100%',
+            padding: '0.55rem 0.7rem',
+            fontSize: '0.95rem',
+            border: '1px solid #d1d5db',
+            borderRadius: 6,
+            resize: 'vertical',
+            boxSizing: 'border-box',
+          }}
+          autoFocus
+          required
+        />
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            style={{
+              padding: '0.5rem 1rem',
+              borderRadius: 6,
+              border: '1px solid #d1d5db',
+              background: '#fff',
+              color: '#374151',
+              cursor: busy ? 'not-allowed' : 'pointer',
+            }}
+          >
+            取消
+          </button>
+          <button
+            type="submit"
+            disabled={busy || !reason.trim()}
+            style={{
+              padding: '0.5rem 1rem',
+              borderRadius: 6,
+              border: 'none',
+              background: '#1e40af',
+              color: '#fff',
+              fontWeight: 600,
+              opacity: busy || !reason.trim() ? 0.6 : 1,
+              cursor: busy || !reason.trim() ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {busy ? '登錄中…' : '確認請假'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
