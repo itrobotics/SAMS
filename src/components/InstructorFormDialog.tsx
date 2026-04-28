@@ -8,10 +8,12 @@ import { subscribeOptions } from '../services/appOptions';
 import { createInstructor, updateInstructor } from '../services/instructors';
 import { OPTION_KEYS } from '../types/appOptions';
 import {
+  INSTRUCTORS_COLLECTION,
   SCHOOL_STATUS_LABELS,
   type InstructorDoc,
   type SchoolStatus,
 } from '../types/instructor';
+import { getNextId } from '../utils/autoId';
 
 interface InstructorFormDialogProps {
   open: boolean;
@@ -60,7 +62,11 @@ export function InstructorFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    setInstructorId(initial?.instructorId ?? '');
+    if (!initial) {
+      getNextId('T', INSTRUCTORS_COLLECTION).then(setInstructorId).catch(() => {});
+    } else {
+      setInstructorId(initial.instructorId);
+    }
     setName(initial?.name ?? '');
     setCourses(initial?.courses ?? []);
     setEducation(initial?.education ?? '');
@@ -139,14 +145,14 @@ export function InstructorFormDialog({
               講師編號<span style={formStyles.required}>*</span>
             </label>
             <input
-              style={{ ...formStyles.input, background: isEdit ? '#f9fafb' : '#fff' }}
+              style={{ ...formStyles.input, background: '#f9fafb' }}
               value={instructorId}
-              onChange={(e) => setInstructorId(e.target.value)}
-              placeholder="例：T001"
-              disabled={isEdit || submitting}
+              readOnly
+              placeholder="載入中…"
+              disabled={submitting}
               required
             />
-            {!isEdit && <span style={formStyles.hint}>建立後不可修改</span>}
+            {!isEdit && <span style={formStyles.hint}>系統自動帶入，建立後不可修改。</span>}
           </div>
           <div style={{ ...formStyles.field, flex: 2 }}>
             <label style={formStyles.label}>

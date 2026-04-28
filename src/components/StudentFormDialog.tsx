@@ -6,7 +6,8 @@ import { Modal } from './Modal';
 import { formStyles } from './formStyles';
 import { useBranches } from '../hooks/useBranches';
 import { createStudent, updateStudent } from '../services/students';
-import { isValidStudentId, type StudentDoc } from '../types/student';
+import { STUDENTS_COLLECTION, isValidStudentId, type StudentDoc } from '../types/student';
+import { getNextId } from '../utils/autoId';
 
 interface StudentFormDialogProps {
   open: boolean;
@@ -38,7 +39,11 @@ export function StudentFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    setStudentId(initial?.studentId ?? '');
+    if (!initial) {
+      getNextId('S', STUDENTS_COLLECTION).then(setStudentId).catch(() => {});
+    } else {
+      setStudentId(initial.studentId);
+    }
     setBranchId(initial?.branchId ?? defaultBranchId ?? '');
     setName(initial?.name ?? '');
     setGrade(initial?.grade ?? '');
@@ -103,15 +108,15 @@ export function StudentFormDialog({
             學號<span style={formStyles.required}>*</span>
           </label>
           <input
-            style={{ ...formStyles.input, ...(isEdit ? { background: '#f9fafb' } : null) }}
+            style={{ ...formStyles.input, background: '#f9fafb' }}
             value={studentId}
-            onChange={(e) => setStudentId(e.target.value)}
-            placeholder="例：S001"
-            disabled={isEdit || submitting}
+            readOnly
+            placeholder="載入中…"
+            disabled={submitting}
             required
           />
           {!isEdit && (
-            <span style={formStyles.hint}>建立後不可修改；用於資料關聯。</span>
+            <span style={formStyles.hint}>系統自動帶入，建立後不可修改。</span>
           )}
         </div>
 

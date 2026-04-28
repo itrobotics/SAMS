@@ -11,11 +11,13 @@ import { formStyles } from './formStyles';
 import { useBranches } from '../hooks/useBranches';
 import { createClass, updateClass } from '../services/classes';
 import {
+  CLASSES_COLLECTION,
   WEEKDAY_LABELS,
   isValidClassId,
   type ClassDoc,
   type ClassMeeting,
 } from '../types/class';
+import { getNextId } from '../utils/autoId';
 
 interface ClassFormDialogProps {
   open: boolean;
@@ -42,7 +44,11 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
 
   useEffect(() => {
     if (!open) return;
-    setClassId(initial?.classId ?? '');
+    if (!initial) {
+      getNextId('C', CLASSES_COLLECTION).then(setClassId).catch(() => {});
+    } else {
+      setClassId(initial.classId);
+    }
     setBranchId(initial?.branchId ?? '');
     setName(initial?.name ?? '');
     setTeacherId(initial?.teacherId ?? '');
@@ -118,11 +124,11 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
           <div style={{ ...formStyles.field, flex: 1 }}>
             <label style={formStyles.label}>班級代碼<span style={formStyles.required}>*</span></label>
             <input
-              style={{ ...formStyles.input, ...(isEdit ? { background: '#f9fafb' } : null) }}
+              style={{ ...formStyles.input, background: '#f9fafb' }}
               value={classId}
-              onChange={(e) => setClassId(e.target.value)}
-              placeholder="例：C001"
-              disabled={isEdit || submitting}
+              readOnly
+              placeholder="載入中…"
+              disabled={submitting}
               required
             />
           </div>
