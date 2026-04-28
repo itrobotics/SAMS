@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { useBranches } from '../hooks/useBranches';
+import { useWebcam } from '../hooks/useWebcam';
 import { ROUTES } from '../routes/paths';
 import { formatTimeWithSec } from '../utils/date';
 
@@ -42,10 +43,14 @@ export function KioskPage() {
   const { branches } = useBranches();
   const branchName = branches.find((b) => b.branchId === branchId)?.name ?? branchId;
 
-  // 暫時的 demo 狀態 — 後續 Task 030/036 會把 setState 接上實際事件
+  // 暫時的 demo 狀態 — Task 036 會把 setState 接上實際事件
   const [state, setState] = useState<KioskState>('IDLE');
   const [match, setMatch] = useState<KioskMatch | null>(null);
   const [now, setNow] = useState(new Date());
+
+  // 攝影機只有在已選定 session（IDLE 之後）才開啟，避免一打開頁面就要權限
+  const cameraEnabled = state !== 'IDLE';
+  const webcam = useWebcam({ enabled: cameraEnabled, width: 1280, height: 720 });
 
   // 大時鐘
   useEffect(() => {
@@ -79,7 +84,7 @@ export function KioskPage() {
 
       {/* 主畫面：依 state 渲染 */}
       <main style={styles.main}>
-        <Stage state={state} match={match} now={now} />
+        <Stage state={state} match={match} now={now} webcam={webcam} />
       </main>
 
       {/* Demo 控制列 — Task 030/036 之後會被替換 / 移除 */}
@@ -115,7 +120,14 @@ export function KioskPage() {
   );
 }
 
-function Stage({ state, match, now }: { state: KioskState; match: KioskMatch | null; now: Date }) {
+function Stage({
+  state, match, now, webcam,
+}: {
+  state: KioskState;
+  match: KioskMatch | null;
+  now: Date;
+  webcam: ReturnType<typeof useWebcam>;
+}) {
   switch (state) {
     case 'IDLE':
       return (
@@ -123,13 +135,14 @@ function Stage({ state, match, now }: { state: KioskState; match: KioskMatch | n
           <div style={styles.cameraPlaceholder}>📷</div>
           <h1 style={styles.bigTitle}>請站到鏡頭前</h1>
           <p style={styles.subText}>準備為您報到</p>
+          <p style={styles.devNote}>（Task 031 加入「選擇場次」按鈕；按下後啟動攝影機）</p>
         </div>
       );
 
     case 'READY':
       return (
         <div style={styles.center}>
-          <div style={styles.cameraPlaceholder}>📷</div>
+          <CameraView webcam={webcam} />
           <h1 style={styles.bigTitle}>Ready to Check-in</h1>
           <p style={styles.subText}>看著鏡頭，保持微笑</p>
         </div>
@@ -138,9 +151,7 @@ function Stage({ state, match, now }: { state: KioskState; match: KioskMatch | n
     case 'SCANNING':
       return (
         <div style={styles.center}>
-          <div style={{ ...styles.cameraPlaceholder, animation: 'sams-pulse 1.2s ease-in-out infinite' }}>
-            📸
-          </div>
+          <CameraView webcam={webcam} scanning />
           <h1 style={styles.bigTitle}>辨識中…</h1>
           <p style={styles.subText}>請保持不動</p>
           <KioskKeyframes />
@@ -194,6 +205,43 @@ function Stage({ state, match, now }: { state: KioskState; match: KioskMatch | n
         </div>
       );
   }
+}
+
+function CameraView({
+  webcam, scanning = false,
+}: {
+  webcam: ReturnType<typeof useWebcam>;
+  scanning?: boolean;
+}) {
+  return (
+    <div style={styles.cameraFrame}>
+      <video
+        ref={webcam.videoRef}
+        muted
+        autoPlay
+        playsInline
+        style={{
+          ...styles.video,
+          // 鏡像（自助使用更直覺）
+          transform: 'scaleX(-1)',
+          ...(scanning ? { boxShadow: '0 0 0 4px #2563eb, 0 0 24px #2563eb' } : null),
+        }}
+      />
+      {webcam.status === 'pending' && (
+        <div style={styles.cameraOverlay}>正在啟動攝影機…</div>
+      )}
+      {webcam.status === 'denied' && (
+        <div style={{ ...styles.cameraOverlay, background: '#7f1d1d' }}>
+          ✕ 攝影機權限被拒絕，請於瀏覽器設定中開啟後重新整理
+        </div>
+      )}
+      {webcam.status === 'error' && (
+        <div style={{ ...styles.cameraOverlay, background: '#7f1d1d' }}>
+          ✕ 攝影機錯誤：{webcam.error}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function greeting(d: Date): string {
@@ -252,6 +300,23 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'background 0.4s',
   },
   cameraPlaceholder: { fontSize: '8rem', opacity: 0.7, marginBottom: '1.5rem' },
+  cameraFrame: {
+    position: 'relative',
+    width: 'min(640px, 70vw)',
+    aspectRatio: '4 / 3',
+    background: '#000',
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: '1.5rem',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+  },
+  video: { width: '100%', height: '100%', objectFit: 'cover', transition: 'box-shadow 0.3s' },
+  cameraOverlay: {
+    position: 'absolute', inset: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'rgba(15,23,42,0.85)', color: '#f1f5f9',
+    fontSize: '1.05rem', textAlign: 'center', padding: '1rem',
+  },
   bigTitle: { margin: 0, fontSize: '3rem', fontWeight: 700 },
   subText: { marginTop: '0.75rem', color: '#cbd5e1', fontSize: '1.25rem' },
 
