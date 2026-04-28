@@ -30,7 +30,10 @@ import {
 } from '../hooks/useRealtime';
 import { useWebcam } from '../hooks/useWebcam';
 import { ROUTES } from '../routes/paths';
+import { updateAttendance } from '../services/attendance';
 import { subscribeBranchSettings } from '../services/settings';
+import { decideManualCheckinStatus } from '../utils/attendance';
+import { makeRecordId } from '../types/attendance';
 import { DEFAULT_BRANCH_SETTINGS, type BranchSettings } from '../types/settings';
 import { formatTimeWithSec, todayISO } from '../utils/date';
 
@@ -103,6 +106,64 @@ export function KioskPage() {
   // 訂閱今日所有 attendance_records（給辨識迴圈算「比對範圍學生」用）
   const attendanceRT = useBranchDayAttendanceRealtime(branchId, today);
 
+  // === Task 040 manual fallback ===
+  // 從 selectedSessions × attendance_records 組出「尚未報到」候選名單。
+  const manualCandidates = (() => {
+    if (selectedSessions.size === 0) return [];
+    const list: Array<{
+      studentId: string; studentName: string; sessionId: string;
+      sessionLabel: string; status: string;
+    }> = [];
+    for (const r of attendanceRT.data) {
+      if (!selectedSessions.has(r.sessionId)) continue;
+      if (r.status === 'CHECKED_IN' || r.status === 'LATE' || r.status === 'MAKEUP') continue;
+      const session = todaySessionsRT.data.find((s) => s.sessionId === r.sessionId);
+      list.push({
+        studentId: r.studentId,
+        studentName: r.studentName,
+        sessionId: r.sessionId,
+        sessionLabel: session ? `${session.className} ${session.startTime}` : r.sessionId,
+        status: r.status,
+      });
+    }
+    return list;
+  })();
+
+  function switchToManual() {
+    setMatch(null);
+    setState('MANUAL');
+  }
+
+  function cancelManual() {
+    setState('READY');
+  }
+
+  async function manualCheckin(c: { studentId: string; studentName: string; sessionId: string }) {
+    const session = todaySessionsRT.data.find((s) => s.sessionId === c.sessionId);
+    const status = session
+      ? decideManualCheckinStatus(
+          new Date(),
+          session.date,
+          session.startTime,
+          settings?.graceMinutes ?? DEFAULT_BRANCH_SETTINGS.graceMinutes,
+        )
+      : 'CHECKED_IN';
+    await updateAttendance(makeRecordId(c.sessionId, c.studentId), {
+      status,
+      method: 'MANUAL',
+      confidence: null,
+      operatorId: user?.userId ?? null,
+      setCheckinNow: true,
+    });
+    setMatch({
+      studentId: c.studentId,
+      studentName: c.studentName,
+      confidence: 1,
+      recordedAt: new Date(),
+    });
+    setState('SUCCESS');
+  }
+
   // 啟動辨識 loop（READY 狀態時運作）
   const checkin = useKioskCheckin({
     enabled: state === 'READY' || state === 'SCANNING',
@@ -173,6 +234,10 @@ export function KioskPage() {
             modelError={checkin.modelError}
             onConfirmMatch={checkin.confirmMatch}
             onRejectMatch={checkin.rejectMatch}
+            onSwitchToManual={switchToManual}
+            onManualCheckin={manualCheckin}
+            onCancelManual={cancelManual}
+            manualCandidates={manualCandidates}
           />
         )}
       </main>
@@ -193,9 +258,18 @@ export function KioskPage() {
   );
 }
 
+interface ManualCandidate {
+  studentId: string;
+  studentName: string;
+  sessionId: string;
+  sessionLabel: string;
+  status: string;
+}
+
 function Stage({
   state, match, now, webcam, selectedCount, modelLoading, modelError,
   onConfirmMatch, onRejectMatch,
+  onSwitchToManual, onManualCheckin, onCancelManual, manualCandidates,
 }: {
   state: KioskState;
   match: KioskMatch | null;
@@ -206,6 +280,10 @@ function Stage({
   modelError: string | null;
   onConfirmMatch: (m: KioskMatch) => Promise<void>;
   onRejectMatch: () => void;
+  onSwitchToManual: () => void;
+  onManualCheckin: (c: ManualCandidate) => Promise<void>;
+  onCancelManual: () => void;
+  manualCandidates: ManualCandidate[];
 }) {
   switch (state) {
     case 'IDLE':
@@ -283,17 +361,129 @@ function Stage({
           <div style={styles.failIcon}>✕</div>
           <h1 style={styles.failTitle}>辨識失敗</h1>
           <p style={styles.failMsg}>無法辨識，請老師協助</p>
+          <button
+            type="button"
+            onClick={onSwitchToManual}
+            style={{
+              marginTop: '1.5rem', padding: '0.85rem 1.75rem',
+              background: '#fff', color: '#991b1b', border: 'none',
+              borderRadius: 8, fontSize: '1.05rem', fontWeight: 600,
+            }}
+          >
+            老師手動報到
+          </button>
         </div>
       );
 
     case 'MANUAL':
       return (
-        <div style={styles.center}>
-          <h1 style={styles.bigTitle}>老師協助手動報到</h1>
-          <p style={styles.subText}>（Task 040 加入學生搜尋與選擇）</p>
-        </div>
+        <ManualFallback
+          onCheckin={onManualCheckin}
+          onCancel={onCancelManual}
+          candidates={manualCandidates}
+        />
       );
   }
+}
+
+function ManualFallback({
+  candidates, onCheckin, onCancel,
+}: {
+  candidates: ManualCandidate[];
+  onCheckin: (c: ManualCandidate) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [keyword, setKeyword] = useState('');
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  const filtered = candidates.filter((c) => {
+    if (!keyword.trim()) return true;
+    const k = keyword.trim().toLowerCase();
+    return c.studentName.toLowerCase().includes(k) || c.studentId.toLowerCase().includes(k);
+  });
+
+  async function handleCheckin(c: ManualCandidate) {
+    const key = `${c.sessionId}__${c.studentId}`;
+    setBusyKey(key);
+    try { await onCheckin(c); } finally { setBusyKey(null); }
+  }
+
+  return (
+    <div style={styles.center}>
+      <div style={{ ...styles.confirmCard, width: 'min(640px, 90vw)' }}>
+        <h2 style={{ margin: 0, fontSize: '1.5rem', textAlign: 'left' }}>老師手動報到</h2>
+        <p style={{ color: '#cbd5e1', fontSize: '0.9rem', textAlign: 'left', marginTop: '0.4rem' }}>
+          搜尋目前比對範圍內、尚未報到的學生
+        </p>
+
+        <input
+          type="search"
+          placeholder="搜尋姓名 / 學號"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          autoFocus
+          style={{
+            width: '100%', padding: '0.7rem 0.9rem', fontSize: '1rem',
+            border: '1px solid #475569', borderRadius: 6, background: '#0f172a',
+            color: '#f1f5f9', marginTop: '0.75rem', outline: 'none',
+          }}
+        />
+
+        <ul style={{
+          listStyle: 'none', padding: 0, margin: '0.75rem 0 0',
+          maxHeight: 320, overflow: 'auto', textAlign: 'left',
+        }}>
+          {filtered.length === 0 && (
+            <li style={{ padding: '1rem', color: '#94a3b8', textAlign: 'center' }}>
+              {candidates.length === 0 ? '比對範圍內所有學生都已報到 / 請假' : '沒有符合的學生'}
+            </li>
+          )}
+          {filtered.map((c) => {
+            const key = `${c.sessionId}__${c.studentId}`;
+            return (
+              <li
+                key={key}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '0.6rem 0.8rem', borderBottom: '1px solid #334155',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '1rem' }}>{c.studentName}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.15rem' }}>
+                    <code>{c.studentId}</code> · {c.sessionLabel}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCheckin(c)}
+                  disabled={busyKey === key}
+                  style={{
+                    padding: '0.45rem 0.85rem', background: '#16a34a', color: '#fff',
+                    border: 'none', borderRadius: 6, fontSize: '0.9rem', fontWeight: 600,
+                  }}
+                >
+                  {busyKey === key ? '處理中…' : '報到'}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            marginTop: '1rem', padding: '0.6rem 1rem',
+            background: 'transparent', color: '#cbd5e1',
+            border: '1px solid #475569', borderRadius: 6, fontSize: '0.9rem', width: '100%',
+          }}
+        >
+          取消
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function CameraView({
