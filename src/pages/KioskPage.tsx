@@ -17,10 +17,15 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
+import {
+  KioskSessionSelector,
+  defaultSelectedSessionIds,
+} from '../components/KioskSessionSelector';
 import { useBranches } from '../hooks/useBranches';
+import { useBranchDaySessionsRealtime } from '../hooks/useRealtime';
 import { useWebcam } from '../hooks/useWebcam';
 import { ROUTES } from '../routes/paths';
-import { formatTimeWithSec } from '../utils/date';
+import { formatTimeWithSec, todayISO } from '../utils/date';
 
 export type KioskState =
   | 'IDLE'
@@ -47,6 +52,33 @@ export function KioskPage() {
   const [state, setState] = useState<KioskState>('IDLE');
   const [match, setMatch] = useState<KioskMatch | null>(null);
   const [now, setNow] = useState(new Date());
+
+  // 已勾選的場次（Task 031）
+  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
+  const today = todayISO();
+  const todaySessionsRT = useBranchDaySessionsRealtime(branchId, today);
+
+  // 第一次載入完成、selected 還是空時，自動勾選「進行中」場次
+  useEffect(() => {
+    if (todaySessionsRT.loading) return;
+    if (selectedSessions.size > 0) return;
+    const defaults = defaultSelectedSessionIds(todaySessionsRT.data);
+    if (defaults.size > 0) setSelectedSessions(defaults);
+  }, [todaySessionsRT.loading, todaySessionsRT.data, selectedSessions.size]);
+
+  function toggleSession(sessionId: string) {
+    setSelectedSessions((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) next.delete(sessionId);
+      else next.add(sessionId);
+      return next;
+    });
+  }
+
+  function startKiosk() {
+    if (selectedSessions.size === 0) return;
+    setState('READY');
+  }
 
   // 攝影機只有在已選定 session（IDLE 之後）才開啟，避免一打開頁面就要權限
   const cameraEnabled = state !== 'IDLE';
@@ -84,7 +116,20 @@ export function KioskPage() {
 
       {/* 主畫面：依 state 渲染 */}
       <main style={styles.main}>
-        <Stage state={state} match={match} now={now} webcam={webcam} />
+        {state === 'IDLE' ? (
+          <div style={styles.center}>
+            {branchId && (
+              <KioskSessionSelector
+                branchId={branchId}
+                selected={selectedSessions}
+                onToggle={toggleSession}
+                onConfirm={startKiosk}
+              />
+            )}
+          </div>
+        ) : (
+          <Stage state={state} match={match} now={now} webcam={webcam} selectedCount={selectedSessions.size} />
+        )}
       </main>
 
       {/* Demo 控制列 — Task 030/036 之後會被替換 / 移除 */}
@@ -121,23 +166,18 @@ export function KioskPage() {
 }
 
 function Stage({
-  state, match, now, webcam,
+  state, match, now, webcam, selectedCount,
 }: {
   state: KioskState;
   match: KioskMatch | null;
   now: Date;
   webcam: ReturnType<typeof useWebcam>;
+  selectedCount: number;
 }) {
   switch (state) {
     case 'IDLE':
-      return (
-        <div style={styles.center}>
-          <div style={styles.cameraPlaceholder}>📷</div>
-          <h1 style={styles.bigTitle}>請站到鏡頭前</h1>
-          <p style={styles.subText}>準備為您報到</p>
-          <p style={styles.devNote}>（Task 031 加入「選擇場次」按鈕；按下後啟動攝影機）</p>
-        </div>
-      );
+      // 由上層改用 KioskSessionSelector 渲染；此 case 不會被走到
+      return null;
 
     case 'READY':
       return (
@@ -145,6 +185,7 @@ function Stage({
           <CameraView webcam={webcam} />
           <h1 style={styles.bigTitle}>Ready to Check-in</h1>
           <p style={styles.subText}>看著鏡頭，保持微笑</p>
+          <p style={styles.devNote}>比對範圍：{selectedCount} 個場次</p>
         </div>
       );
 
