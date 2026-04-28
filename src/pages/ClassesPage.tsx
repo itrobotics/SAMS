@@ -9,6 +9,7 @@ import { ClassFormDialog } from '../components/ClassFormDialog';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { setClassActive, subscribeClasses } from '../services/classes';
+import { fetchAllActiveClassStudentCounts } from '../services/classStudents';
 import { WEEKDAY_LABELS, formatMeetingsLabel, type ClassDoc } from '../types/class';
 
 const ALL = '__all__';
@@ -24,6 +25,7 @@ export function ClassesPage() {
   const [filterWeekday, setFilterWeekday] = useState<number | typeof ALL>(ALL);
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'disabled'>('active');
   const [filterTeacher, setFilterTeacher] = useState('');
+  const [studentCounts, setStudentCounts] = useState<Map<string, number>>(new Map());
   const [editing, setEditing] = useState<ClassDoc | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -42,6 +44,10 @@ export function ClassesPage() {
       setBusyId(null);
     }
   }
+
+  useEffect(() => {
+    fetchAllActiveClassStudentCounts().then(setStudentCounts).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -146,16 +152,17 @@ export function ClassesPage() {
               <th style={styles.th}>預設老師</th>
               <th style={styles.th}>預設教室</th>
               <th style={styles.th}>上課時段</th>
+              <th style={styles.th}>學生人數</th>
               <th style={styles.th}>狀態</th>
               <th style={styles.th}>操作</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8} style={styles.empty}>載入中…</td></tr>
+              <tr><td colSpan={9} style={styles.empty}>載入中…</td></tr>
             )}
             {!loading && visible.length === 0 && (
-              <tr><td colSpan={8} style={styles.empty}>沒有符合條件的班級</td></tr>
+              <tr><td colSpan={9} style={styles.empty}>沒有符合條件的班級</td></tr>
             )}
             {visible.map((c) => (
               <tr key={c.classId}>
@@ -167,6 +174,9 @@ export function ClassesPage() {
                 <td style={styles.td}>{c.teacherId || '—'}</td>
                 <td style={styles.td}>{c.classroom || '—'}</td>
                 <td style={styles.td}>{formatMeetingsLabel(c.meetings ?? [])}</td>
+                <td style={{ ...styles.td, textAlign: 'center' }}>
+                  {studentCounts.get(c.classId) ?? 0}
+                </td>
                 <td style={styles.td}>
                   <span style={c.active ? styles.pillActive : styles.pillInactive}>
                     {c.active ? '啟用' : '停用'}

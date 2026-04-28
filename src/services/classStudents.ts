@@ -105,6 +105,21 @@ export async function reactivateStudentInClass(classId: string, studentId: strin
   await updateDoc(csRef(classId, studentId), { active: true });
 }
 
+// 一次性查詢所有班級的啟用中學生人數（Task 048）
+export async function fetchAllActiveClassStudentCounts(): Promise<Map<string, number>> {
+  const q = query(
+    collection(db, CLASS_STUDENTS_COLLECTION),
+    where('active', '==', true),
+  );
+  const snap = await getDocs(q);
+  const counts = new Map<string, number>();
+  snap.docs.forEach((d) => {
+    const classId = (d.data() as ClassStudentDoc).classId;
+    counts.set(classId, (counts.get(classId) ?? 0) + 1);
+  });
+  return counts;
+}
+
 // 真正刪除（管理用）— 目前 UI 不開放
 export async function deleteRoster(classId: string, studentId: string): Promise<void> {
   await deleteDoc(csRef(classId, studentId));
