@@ -67,6 +67,23 @@ export function subscribeSessionsForBranchDate(
   );
 }
 
+// HQ Dashboard 用：給定一天，跨所有分校所有 sessions
+export function subscribeAllSessionsForDate(
+  date: string,
+  onChange: (sessions: SessionDoc[]) => void,
+  onError?: (e: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(db, SESSIONS_COLLECTION),
+    where('date', '==', date),
+  );
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map(snapshotToSession)),
+    (err) => onError?.(err),
+  );
+}
+
 export async function setSessionStatus(sessionId: string, status: SessionStatus): Promise<void> {
   await updateDoc(sessionRef(sessionId), { status });
 }

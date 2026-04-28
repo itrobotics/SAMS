@@ -50,6 +50,28 @@ export function subscribeAttendanceForSession(
   );
 }
 
+// HQ Dashboard 用：給定一天，跨所有分校的 attendance_records。
+// 用 sessionId range query：sessionId 以 YYYYMMDD_ 開頭。
+export function subscribeAllAttendanceForDate(
+  date: string,
+  onChange: (records: AttendanceRecordDoc[]) => void,
+  onError?: (e: Error) => void,
+): Unsubscribe {
+  const compact = date.split('-').join('');
+  const startId = `${compact}_`;
+  const endId = `${compact}` + '`';
+  const q = query(
+    collection(db, ATTENDANCE_RECORDS_COLLECTION),
+    where('sessionId', '>=', startId),
+    where('sessionId', '<', endId),
+  );
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map(snapshotToRec)),
+    (err) => onError?.(err),
+  );
+}
+
 export function subscribeAttendanceForBranchDate(
   branchId: string,
   date: string, // 用 sessionId prefix 篩選不太實用，改為直接 where date
