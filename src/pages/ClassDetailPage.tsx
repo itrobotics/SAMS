@@ -1,6 +1,6 @@
-// 班級學生管理頁（Task 019）
+// 班級學生管理頁（Task 019, updated Task 049）
 //
-// 顯示班級基本資訊、目前已加入學生（active）、可加入的同分校學生清單。
+// 顯示班級基本資訊、目前已加入學生（active）、可加入的全分校學生候選清單。
 // 加入 = setDoc with merge（idempotent，可恢復已退出的學生）；
 // 移除 = active=false（軟刪），不破壞歷史出席紀錄關聯。
 
@@ -28,8 +28,9 @@ export function ClassDetailPage() {
   const { branches } = useBranches();
   const [klass, setKlass] = useState<ClassDoc | null | 'missing'>(null);
   const [roster, setRoster] = useState<ClassStudentDoc[]>([]);
-  const [branchStudents, setBranchStudents] = useState<StudentDoc[]>([]);
+  const [allStudents, setAllStudents] = useState<StudentDoc[]>([]);
   const [keyword, setKeyword] = useState('');
+  const [candidateBranch, setCandidateBranch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,12 +54,12 @@ export function ClassDetailPage() {
     return unsub;
   }, [classId]);
 
-  // 訂閱該分校學生（只在 class 載入後啟動）
+  // 訂閱全部分校的啟用中學生（Task 049：跨分校加入）
   useEffect(() => {
     if (!klass || klass === 'missing') return;
     const unsub = subscribeStudents(
-      { branchIds: [klass.branchId], activeOnly: true },
-      setBranchStudents,
+      { activeOnly: true },
+      setAllStudents,
       (e) => setError(e.message),
     );
     return unsub;
@@ -72,19 +73,20 @@ export function ClassDetailPage() {
   );
   const candidates = useMemo(() => {
     const kw = keyword.trim().toLowerCase();
-    return branchStudents
+    return allStudents
       .filter((s) => !activeRosterIds.has(s.studentId))
+      .filter((s) => !candidateBranch || s.branchId === candidateBranch)
       .filter((s) => {
         if (!kw) return true;
         return `${s.name} ${s.studentId}`.toLowerCase().includes(kw);
       })
       .slice(0, 50);
-  }, [branchStudents, activeRosterIds, keyword]);
+  }, [allStudents, activeRosterIds, keyword, candidateBranch]);
   const studentById = useMemo(() => {
     const map = new Map<string, StudentDoc>();
-    branchStudents.forEach((s) => map.set(s.studentId, s));
+    allStudents.forEach((s) => map.set(s.studentId, s));
     return map;
-  }, [branchStudents]);
+  }, [allStudents]);
 
   if (klass === null) return <div style={{ color: '#6b7280' }}>載入中…</div>;
   if (klass === 'missing') {
@@ -198,36 +200,52 @@ export function ClassDetailPage() {
         </article>
 
         <article style={styles.card}>
-          <h2 style={styles.h2}>可加入學生（{branchName}）</h2>
-          <input
-            type="search"
-            placeholder="搜尋姓名 / 學號"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            style={styles.search}
-          />
+          <h2 style={styles.h2}>可加入學生（全分校）</h2>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <select
+              value={candidateBranch}
+              onChange={(e) => setCandidateBranch(e.target.value)}
+              style={{ ...styles.search, margin: 0, flex: 1 }}
+            >
+              <option value="">全部分校</option>
+              {branches.map((b) => (
+                <option key={b.branchId} value={b.branchId}>{b.name}</option>
+              ))}
+            </select>
+            <input
+              type="search"
+              placeholder="搜尋姓名 / 學號"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              style={{ ...styles.search, margin: 0, flex: 2 }}
+            />
+          </div>
           {candidates.length === 0 && (
             <p style={styles.placeholder}>找不到符合條件的學生</p>
           )}
           <ul style={styles.list}>
-            {candidates.map((s) => (
-              <li key={s.studentId} style={styles.row}>
-                <span>
-                  {s.name}
-                  <span style={styles.rowMeta}>
-                    <code>{s.studentId}</code>{s.grade ? ` · ${s.grade}` : ''}
+            {candidates.map((s) => {
+              const sBranchName = branches.find((b) => b.branchId === s.branchId)?.name ?? s.branchId;
+              return (
+                <li key={s.studentId} style={styles.row}>
+                  <span>
+                    {s.name}
+                    <span style={styles.rowMeta}>
+                      <code>{s.studentId}</code>{s.grade ? ` · ${s.grade}` : ''}
+                      {' · '}{sBranchName}
+                    </span>
                   </span>
-                </span>
-                <button
-                  type="button"
-                  style={styles.addBtn}
-                  onClick={() => handleAdd(s)}
-                  disabled={busyId === s.studentId}
-                >
-                  {busyId === s.studentId ? '處理中…' : '＋ 加入'}
-                </button>
-              </li>
-            ))}
+                  <button
+                    type="button"
+                    style={styles.addBtn}
+                    onClick={() => handleAdd(s)}
+                    disabled={busyId === s.studentId}
+                  >
+                    {busyId === s.studentId ? '處理中…' : '＋ 加入'}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </article>
       </div>
