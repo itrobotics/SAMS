@@ -171,6 +171,8 @@ export function KioskPage() {
             selectedCount={selectedSessions.size}
             modelLoading={checkin.modelLoading}
             modelError={checkin.modelError}
+            onConfirmMatch={checkin.confirmMatch}
+            onRejectMatch={checkin.rejectMatch}
           />
         )}
       </main>
@@ -193,6 +195,7 @@ export function KioskPage() {
 
 function Stage({
   state, match, now, webcam, selectedCount, modelLoading, modelError,
+  onConfirmMatch, onRejectMatch,
 }: {
   state: KioskState;
   match: KioskMatch | null;
@@ -201,6 +204,8 @@ function Stage({
   selectedCount: number;
   modelLoading: boolean;
   modelError: string | null;
+  onConfirmMatch: (m: KioskMatch) => Promise<void>;
+  onRejectMatch: () => void;
 }) {
   switch (state) {
     case 'IDLE':
@@ -246,14 +251,18 @@ function Stage({
             <h2 style={styles.confirmName}>可能是：{match?.studentName ?? '—'}</h2>
             <p style={styles.confirmConf}>信心值 {(match?.confidence ?? 0).toFixed(2)}</p>
             <div style={styles.confirmBtns}>
-              <button type="button" style={styles.btnPrimary} disabled>
+              <button
+                type="button"
+                style={styles.btnPrimary}
+                onClick={() => match && onConfirmMatch(match)}
+                disabled={!match}
+              >
                 確認報到
               </button>
-              <button type="button" style={styles.btnSecondary} disabled>
+              <button type="button" style={styles.btnSecondary} onClick={onRejectMatch}>
                 不是此人
               </button>
             </div>
-            <p style={styles.devNote}>（Task 039 啟用按鈕）</p>
           </div>
         </div>
       );

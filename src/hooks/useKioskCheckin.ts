@@ -73,6 +73,9 @@ interface KioskCheckinStatus {
   modelError: string | null;
   lastScanAt: Date | null;
   matchProfiles: number; // 目前比對範圍的 active 照片數
+  // Task 039：CONFIRMING 狀態用的 callbacks
+  confirmMatch: (m: KioskMatch) => Promise<void>;
+  rejectMatch: () => void;
 }
 
 export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
@@ -247,11 +250,45 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
     };
   }, [args.enabled, runOneScan]);
 
+  // Task 039：CONFIRMING → 確認報到
+  const confirmMatch = useCallback(async (m: KioskMatch) => {
+    const ownRecords = args.attendanceForToday.filter(
+      (r) => r.studentId === m.studentId && args.selectedSessions.has(r.sessionId),
+    );
+    if (ownRecords.length === 0) {
+      args.setKioskState('FAILED');
+      return;
+    }
+    for (const rec of ownRecords) {
+      const session = args.todaySessions.find((s) => s.sessionId === rec.sessionId);
+      const status = session
+        ? decideManualCheckinStatus(new Date(), session.date, session.startTime, args.graceMinutes)
+        : 'CHECKED_IN';
+      const recordId = makeRecordId(rec.sessionId, rec.studentId);
+      await updateAttendance(recordId, {
+        status,
+        method: 'FACE',
+        confidence: Number(m.confidence.toFixed(4)),
+        operatorId: args.operatorId,
+        setCheckinNow: true,
+      });
+    }
+    cooldownRef.current.set(m.studentId, Date.now());
+    args.setKioskState('SUCCESS');
+  }, [args]);
+
+  const rejectMatch = useCallback(() => {
+    args.setMatch(null);
+    args.setKioskState('FAILED');
+  }, [args]);
+
   return {
     modelLoaded,
     modelLoading,
     modelError,
     lastScanAt,
     matchProfiles: 0, // Task 041 會把整個 stats 補齊
+    confirmMatch,
+    rejectMatch,
   };
 }
