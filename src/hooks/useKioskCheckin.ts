@@ -82,18 +82,34 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
       });
   }, [modelLoaded, modelLoading]);
 
-  // 2) 計算「比對範圍」— Task 037 收緊版
-  // 從 selectedSessions 找出被點名應到的學生，再撈他們的 active face_profiles
+  // 2) 計算「比對範圍」— Task 037
+  //
+  // 規格 7-3：只比對「本分校 + 今日應到學生」。
+  // 我們再加一層：
+  //   - 只看「已勾選的 sessions」內的應到名單（operator 在 Task 031 選的）
+  //   - 跳過 status === LEAVE / CANCELLED（請假 / 取消的學生不該比對）
+  //   - 跳過 status === CHECKED_IN / LATE（已到，避免重複觸發 / 提升效能）
+  //
+  // 學生若「同時跨多個已勾選 sessions」(例如安親 + 才藝接續)，只要任一場仍為
+  // SCHEDULED / ABSENT 就會被納入比對；命中後同學生在所有相關 sessions 一次寫入。
+  //
+  // listActiveProfilesForStudents() 已硬性過濾 branchId + active=true，
+  // 所以「同分校」與「active 照片」也成立。
   const computeTargetStudentIds = useCallback((): string[] => {
     if (args.selectedSessions.size === 0) return [];
-    const ids = new Set<string>();
+    const needsCheckin = new Set<string>();   // 仍需報到
+    const alreadyDone = new Set<string>();    // 已到（不重複觸發）
     for (const r of args.attendanceForToday) {
       if (!args.selectedSessions.has(r.sessionId)) continue;
-      // 已 LEAVE / CANCELLED 的學生不在比對範圍
       if (r.status === 'LEAVE' || r.status === 'CANCELLED') continue;
-      ids.add(r.studentId);
+      if (r.status === 'CHECKED_IN' || r.status === 'LATE' || r.status === 'MAKEUP') {
+        alreadyDone.add(r.studentId);
+      } else {
+        needsCheckin.add(r.studentId);
+      }
     }
-    return Array.from(ids);
+    // 一個學生若在 A 班已到、B 班還沒到，仍需要被比對 → 留在 needsCheckin
+    return Array.from(needsCheckin);
   }, [args.selectedSessions, args.attendanceForToday]);
 
   // 3) 主流程：擷取一幀 → 偵測 → 匹配 → 寫 attendance
