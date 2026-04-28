@@ -1,0 +1,59 @@
+rules_version = '2';
+
+// SAMS Firestore Security Rules
+// 部署時間：取代 Console 預設的 30 天 test mode（全開）。
+//
+// 目前策略（Phase 6 / MVP 階段）：
+//   1. 一律拒絕未登入存取（最重要的修補）
+//   2. users 文件加強：使用者可改自己的姓名 / email，但不能改 role / branchIds /
+//      active（避免自己把自己升 hq_admin）；建立 / 刪除 user 只給 HQ。
+//   3. 其他 collection 維持「登入即可讀寫」— 分校隔離繼續靠 client + Firestore
+//      query 的 where('branchId', 'in', ...) 處理。Phase 11 之後會把分校隔離
+//      上升到 rules 層，但要等 query 全部都帶 branchId filter 才能切換。
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function callerRole() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : '';
+    }
+
+    function isHQ() {
+      return callerRole() == 'hq_admin';
+    }
+
+    // users/{uid}
+    //   read: 自己的 doc 或 HQ
+    //   create / delete: HQ only
+    //   update: HQ 全權；當事人自己改但禁動 role / branchIds / active
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isHQ());
+      allow create, delete: if isHQ();
+      allow update: if isHQ()
+        || (signedIn()
+            && request.auth.uid == uid
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.branchIds == resource.data.branchIds
+            && request.resource.data.active == resource.data.active);
+    }
+
+    // 其他 collection：要登入；分校隔離由 client 端控制（暫時）
+    match /branches/{id}            { allow read, write: if signedIn(); }
+    match /students/{id}            { allow read, write: if signedIn(); }
+    match /classes/{id}             { allow read, write: if signedIn(); }
+    match /class_students/{id}      { allow read, write: if signedIn(); }
+    match /sessions/{id}            { allow read, write: if signedIn(); }
+    match /attendance_records/{id}  { allow read, write: if signedIn(); }
+    match /settings/{id}            { allow read, write: if signedIn(); }
+    match /face_profiles/{id}       { allow read, write: if signedIn(); }
+    match /leave_requests/{id}      { allow read, write: if signedIn(); }
+    match /logs/{id}                { allow read, write: if signedIn(); }
+  }
+}
