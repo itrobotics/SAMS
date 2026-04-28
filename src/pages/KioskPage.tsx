@@ -21,10 +21,17 @@ import {
   KioskSessionSelector,
   defaultSelectedSessionIds,
 } from '../components/KioskSessionSelector';
+import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
-import { useBranchDaySessionsRealtime } from '../hooks/useRealtime';
+import { useKioskCheckin } from '../hooks/useKioskCheckin';
+import {
+  useBranchDayAttendanceRealtime,
+  useBranchDaySessionsRealtime,
+} from '../hooks/useRealtime';
 import { useWebcam } from '../hooks/useWebcam';
 import { ROUTES } from '../routes/paths';
+import { subscribeBranchSettings } from '../services/settings';
+import { DEFAULT_BRANCH_SETTINGS, type BranchSettings } from '../types/settings';
 import { formatTimeWithSec, todayISO } from '../utils/date';
 
 export type KioskState =
@@ -46,6 +53,7 @@ export interface KioskMatch {
 export function KioskPage() {
   const { branchId } = useParams<{ branchId: string }>();
   const { branches } = useBranches();
+  const { user } = useAuth();
   const branchName = branches.find((b) => b.branchId === branchId)?.name ?? branchId;
 
   // 暫時的 demo 狀態 — Task 036 會把 setState 接上實際事件
@@ -83,6 +91,31 @@ export function KioskPage() {
   // 攝影機只有在已選定 session（IDLE 之後）才開啟，避免一打開頁面就要權限
   const cameraEnabled = state !== 'IDLE';
   const webcam = useWebcam({ enabled: cameraEnabled, width: 1280, height: 720 });
+
+  // 訂閱分校設定（取 graceMinutes — 報到時間判定）
+  const [settings, setSettings] = useState<BranchSettings | null>(null);
+  useEffect(() => {
+    if (!branchId) return;
+    const unsub = subscribeBranchSettings(branchId, setSettings);
+    return unsub;
+  }, [branchId]);
+
+  // 訂閱今日所有 attendance_records（給辨識迴圈算「比對範圍學生」用）
+  const attendanceRT = useBranchDayAttendanceRealtime(branchId, today);
+
+  // 啟動辨識 loop（READY 狀態時運作）
+  const checkin = useKioskCheckin({
+    enabled: state === 'READY' || state === 'SCANNING',
+    webcam,
+    branchId: branchId ?? '',
+    selectedSessions,
+    todaySessions: todaySessionsRT.data,
+    attendanceForToday: attendanceRT.data,
+    setKioskState: setState,
+    setMatch,
+    graceMinutes: settings?.graceMinutes ?? DEFAULT_BRANCH_SETTINGS.graceMinutes,
+    operatorId: user?.userId ?? null,
+  });
 
   // 大時鐘
   useEffect(() => {
@@ -128,51 +161,44 @@ export function KioskPage() {
             )}
           </div>
         ) : (
-          <Stage state={state} match={match} now={now} webcam={webcam} selectedCount={selectedSessions.size} />
+          <Stage
+            state={state}
+            match={match}
+            now={now}
+            webcam={webcam}
+            selectedCount={selectedSessions.size}
+            modelLoading={checkin.modelLoading}
+            modelError={checkin.modelError}
+          />
         )}
       </main>
 
-      {/* Demo 控制列 — Task 030/036 之後會被替換 / 移除 */}
-      <footer style={styles.devBar}>
-        <span style={styles.devLabel}>DEMO 控制：</span>
-        {(['IDLE', 'READY', 'SCANNING', 'CONFIRMING', 'SUCCESS', 'FAILED', 'MANUAL'] as KioskState[]).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => {
-              setState(s);
-              if (s === 'SUCCESS' || s === 'CONFIRMING') {
-                setMatch({
-                  studentId: 'S001',
-                  studentName: '王小明',
-                  confidence: s === 'SUCCESS' ? 0.91 : 0.78,
-                  recordedAt: new Date(),
-                });
-              } else {
-                setMatch(null);
-              }
-            }}
-            style={{
-              ...styles.devBtn,
-              ...(state === s ? styles.devBtnActive : null),
-            }}
-          >
-            {s}
-          </button>
-        ))}
+      {/* 狀態列：上次掃描時間 + 比對範圍 */}
+      <footer style={styles.statusBar}>
+        <span style={styles.statusItem}>
+          場次：{selectedSessions.size}
+        </span>
+        <span style={styles.statusItem}>
+          {checkin.modelLoading ? '模型載入中…' : checkin.modelLoaded ? '模型 ✓' : '模型未載入'}
+        </span>
+        <span style={styles.statusItem}>
+          上次掃描：{checkin.lastScanAt ? formatTimeWithSec(checkin.lastScanAt) : '—'}
+        </span>
       </footer>
     </div>
   );
 }
 
 function Stage({
-  state, match, now, webcam, selectedCount,
+  state, match, now, webcam, selectedCount, modelLoading, modelError,
 }: {
   state: KioskState;
   match: KioskMatch | null;
   now: Date;
   webcam: ReturnType<typeof useWebcam>;
   selectedCount: number;
+  modelLoading: boolean;
+  modelError: string | null;
 }) {
   switch (state) {
     case 'IDLE':
@@ -183,9 +209,20 @@ function Stage({
       return (
         <div style={styles.center}>
           <CameraView webcam={webcam} />
-          <h1 style={styles.bigTitle}>Ready to Check-in</h1>
-          <p style={styles.subText}>看著鏡頭，保持微笑</p>
-          <p style={styles.devNote}>比對範圍：{selectedCount} 個場次</p>
+          {modelError ? (
+            <h1 style={{ ...styles.bigTitle, color: '#fca5a5' }}>模型載入失敗：{modelError}</h1>
+          ) : modelLoading ? (
+            <>
+              <h1 style={styles.bigTitle}>載入辨識模型中…</h1>
+              <p style={styles.subText}>第一次大約 6 MB，瀏覽器會自動 cache</p>
+            </>
+          ) : (
+            <>
+              <h1 style={styles.bigTitle}>Ready to Check-in</h1>
+              <p style={styles.subText}>看著鏡頭，保持微笑</p>
+              <p style={styles.devNote}>比對範圍：{selectedCount} 個場次</p>
+            </>
+          )}
         </div>
       );
 
@@ -407,15 +444,10 @@ const styles: Record<string, React.CSSProperties> = {
   failTitle: { margin: 0, fontSize: '2.5rem', color: '#fff' },
   failMsg: { color: '#fee2e2', fontSize: '1.25rem', marginTop: '0.4rem' },
 
-  devBar: {
-    display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap',
-    padding: '0.6rem 1.25rem', background: '#020617', borderTop: '1px solid #1e293b',
+  statusBar: {
+    display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap',
+    padding: '0.5rem 1.25rem', background: '#020617', borderTop: '1px solid #1e293b',
+    color: '#94a3b8', fontSize: '0.8rem',
   },
-  devLabel: { color: '#64748b', fontSize: '0.75rem', marginRight: '0.5rem' },
-  devBtn: {
-    padding: '0.3rem 0.7rem', fontSize: '0.75rem',
-    background: '#1e293b', color: '#cbd5e1',
-    border: '1px solid #334155', borderRadius: 4,
-  },
-  devBtnActive: { background: '#2563eb', color: '#fff', borderColor: '#2563eb' },
+  statusItem: { fontVariantNumeric: 'tabular-nums' },
 };
