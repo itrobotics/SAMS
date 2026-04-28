@@ -1,12 +1,315 @@
-import { useParams } from 'react-router-dom';
+// Kiosk 自助報到頁（Task 029）
+//
+// /kiosk/:branchId
+// 全螢幕、無 AppLayout（在 AppRouter 用 <AuthGuard withLayout={false}>）。
+//
+// 狀態機（spec 規格 7 個狀態）：
+//   IDLE          → 待機（請站到鏡頭前）
+//   READY         → 攝影機就緒、辨識迴圈運作中
+//   SCANNING      → 偵測到臉、計算 embedding
+//   CONFIRMING    → 中信心值（spec 規格 7-4），等老師按鈕
+//   SUCCESS       → 報到成功，顯示姓名 + 時間（3 秒後回 IDLE）
+//   FAILED        → 信心值不足或無臉，提示請老師協助
+//   MANUAL        → 老師接手手動搜尋（Task 040 實作）
+//
+// 本任務只實作 state machine + 各狀態的 UI；攝影機接 Task 030、辨識接 Task 036。
+
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+
+import { useBranches } from '../hooks/useBranches';
+import { ROUTES } from '../routes/paths';
+import { formatTimeWithSec } from '../utils/date';
+
+export type KioskState =
+  | 'IDLE'
+  | 'READY'
+  | 'SCANNING'
+  | 'CONFIRMING'
+  | 'SUCCESS'
+  | 'FAILED'
+  | 'MANUAL';
+
+export interface KioskMatch {
+  studentId: string;
+  studentName: string;
+  confidence: number;
+  recordedAt: Date;
+}
 
 export function KioskPage() {
   const { branchId } = useParams<{ branchId: string }>();
+  const { branches } = useBranches();
+  const branchName = branches.find((b) => b.branchId === branchId)?.name ?? branchId;
+
+  // 暫時的 demo 狀態 — 後續 Task 030/036 會把 setState 接上實際事件
+  const [state, setState] = useState<KioskState>('IDLE');
+  const [match, setMatch] = useState<KioskMatch | null>(null);
+  const [now, setNow] = useState(new Date());
+
+  // 大時鐘
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // SUCCESS 顯示 3 秒後回 IDLE
+  useEffect(() => {
+    if (state !== 'SUCCESS' && state !== 'FAILED') return;
+    const t = setTimeout(() => {
+      setState('READY');
+      setMatch(null);
+    }, state === 'SUCCESS' ? 3000 : 4000);
+    return () => clearTimeout(t);
+  }, [state]);
+
   return (
-    <main style={{ padding: '2rem' }}>
-      <h1>Kiosk 自助報到</h1>
-      <p>branchId: {branchId}</p>
-      <p>Webcam 與人臉辨識將於 Phase 7 / Task 029-031 實作。</p>
-    </main>
+    <div style={styles.shell}>
+      {/* 上方狀態列 */}
+      <header style={styles.topbar}>
+        <div>
+          <span style={styles.brand}>SAMS Kiosk</span>
+          <span style={styles.branchName}>{branchName}</span>
+        </div>
+        <div style={styles.clock}>{formatTimeWithSec(now)}</div>
+        <Link to={ROUTES.branches} style={styles.exitBtn}>
+          結束
+        </Link>
+      </header>
+
+      {/* 主畫面：依 state 渲染 */}
+      <main style={styles.main}>
+        <Stage state={state} match={match} now={now} />
+      </main>
+
+      {/* Demo 控制列 — Task 030/036 之後會被替換 / 移除 */}
+      <footer style={styles.devBar}>
+        <span style={styles.devLabel}>DEMO 控制：</span>
+        {(['IDLE', 'READY', 'SCANNING', 'CONFIRMING', 'SUCCESS', 'FAILED', 'MANUAL'] as KioskState[]).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => {
+              setState(s);
+              if (s === 'SUCCESS' || s === 'CONFIRMING') {
+                setMatch({
+                  studentId: 'S001',
+                  studentName: '王小明',
+                  confidence: s === 'SUCCESS' ? 0.91 : 0.78,
+                  recordedAt: new Date(),
+                });
+              } else {
+                setMatch(null);
+              }
+            }}
+            style={{
+              ...styles.devBtn,
+              ...(state === s ? styles.devBtnActive : null),
+            }}
+          >
+            {s}
+          </button>
+        ))}
+      </footer>
+    </div>
   );
 }
+
+function Stage({ state, match, now }: { state: KioskState; match: KioskMatch | null; now: Date }) {
+  switch (state) {
+    case 'IDLE':
+      return (
+        <div style={styles.center}>
+          <div style={styles.cameraPlaceholder}>📷</div>
+          <h1 style={styles.bigTitle}>請站到鏡頭前</h1>
+          <p style={styles.subText}>準備為您報到</p>
+        </div>
+      );
+
+    case 'READY':
+      return (
+        <div style={styles.center}>
+          <div style={styles.cameraPlaceholder}>📷</div>
+          <h1 style={styles.bigTitle}>Ready to Check-in</h1>
+          <p style={styles.subText}>看著鏡頭，保持微笑</p>
+        </div>
+      );
+
+    case 'SCANNING':
+      return (
+        <div style={styles.center}>
+          <div style={{ ...styles.cameraPlaceholder, animation: 'sams-pulse 1.2s ease-in-out infinite' }}>
+            📸
+          </div>
+          <h1 style={styles.bigTitle}>辨識中…</h1>
+          <p style={styles.subText}>請保持不動</p>
+          <KioskKeyframes />
+        </div>
+      );
+
+    case 'CONFIRMING':
+      return (
+        <div style={styles.center}>
+          <div style={styles.confirmCard}>
+            <div style={{ fontSize: '5rem' }}>🤔</div>
+            <h2 style={styles.confirmName}>可能是：{match?.studentName ?? '—'}</h2>
+            <p style={styles.confirmConf}>信心值 {(match?.confidence ?? 0).toFixed(2)}</p>
+            <div style={styles.confirmBtns}>
+              <button type="button" style={styles.btnPrimary} disabled>
+                確認報到
+              </button>
+              <button type="button" style={styles.btnSecondary} disabled>
+                不是此人
+              </button>
+            </div>
+            <p style={styles.devNote}>（Task 039 啟用按鈕）</p>
+          </div>
+        </div>
+      );
+
+    case 'SUCCESS':
+      return (
+        <div style={{ ...styles.center, background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' }}>
+          <div style={styles.successIcon}>✓</div>
+          <h1 style={styles.successName}>{greeting(now)}，{match?.studentName ?? '同學'}！</h1>
+          <p style={styles.successMsg}>報到成功</p>
+          <p style={styles.successTime}>{formatTimeWithSec(match?.recordedAt ?? now)}</p>
+        </div>
+      );
+
+    case 'FAILED':
+      return (
+        <div style={{ ...styles.center, background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)' }}>
+          <div style={styles.failIcon}>✕</div>
+          <h1 style={styles.failTitle}>辨識失敗</h1>
+          <p style={styles.failMsg}>無法辨識，請老師協助</p>
+        </div>
+      );
+
+    case 'MANUAL':
+      return (
+        <div style={styles.center}>
+          <h1 style={styles.bigTitle}>老師協助手動報到</h1>
+          <p style={styles.subText}>（Task 040 加入學生搜尋與選擇）</p>
+        </div>
+      );
+  }
+}
+
+function greeting(d: Date): string {
+  const h = d.getHours();
+  if (h < 12) return '早安';
+  if (h < 18) return '午安';
+  return '晚安';
+}
+
+function KioskKeyframes() {
+  // 把 keyframes 注入文件 head（避免每次重 render 重新注入）
+  return (
+    <style>{`@keyframes sams-pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.15); opacity: 0.7; }
+    }`}</style>
+  );
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  shell: {
+    minHeight: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    background: '#0f172a',
+    color: '#f1f5f9',
+  },
+  topbar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '0.6rem 1.25rem',
+    background: '#020617',
+    borderBottom: '1px solid #1e293b',
+  },
+  brand: { fontWeight: 700, fontSize: '1rem', letterSpacing: 1 },
+  branchName: { marginLeft: '0.75rem', color: '#94a3b8', fontSize: '0.95rem' },
+  clock: { fontVariantNumeric: 'tabular-nums', fontSize: '1.05rem', color: '#cbd5e1' },
+  exitBtn: {
+    padding: '0.4rem 0.85rem',
+    background: 'transparent',
+    color: '#cbd5e1',
+    border: '1px solid #334155',
+    borderRadius: 6,
+    fontSize: '0.85rem',
+    textDecoration: 'none',
+  },
+  main: { flex: 1, display: 'flex', alignItems: 'stretch', justifyContent: 'stretch' },
+  center: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '2rem',
+    transition: 'background 0.4s',
+  },
+  cameraPlaceholder: { fontSize: '8rem', opacity: 0.7, marginBottom: '1.5rem' },
+  bigTitle: { margin: 0, fontSize: '3rem', fontWeight: 700 },
+  subText: { marginTop: '0.75rem', color: '#cbd5e1', fontSize: '1.25rem' },
+
+  confirmCard: {
+    background: '#1e293b',
+    padding: '2.5rem 3rem',
+    borderRadius: 16,
+    textAlign: 'center',
+    boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
+    minWidth: 360,
+  },
+  confirmName: { margin: '0.75rem 0 0.4rem', fontSize: '2rem' },
+  confirmConf: { color: '#94a3b8', fontSize: '1rem', margin: 0 },
+  confirmBtns: { display: 'flex', gap: '0.75rem', marginTop: '1.5rem', justifyContent: 'center' },
+  btnPrimary: {
+    padding: '0.85rem 1.5rem', background: '#16a34a', color: '#fff',
+    border: 'none', borderRadius: 8, fontSize: '1rem', fontWeight: 600,
+  },
+  btnSecondary: {
+    padding: '0.85rem 1.5rem', background: '#475569', color: '#fff',
+    border: 'none', borderRadius: 8, fontSize: '1rem',
+  },
+  devNote: { color: '#64748b', fontSize: '0.8rem', marginTop: '0.75rem' },
+
+  successIcon: {
+    fontSize: '8rem',
+    width: 160, height: 160, lineHeight: '160px',
+    borderRadius: '50%',
+    background: 'rgba(255,255,255,0.15)',
+    color: '#fff',
+    marginBottom: '1.5rem',
+    fontWeight: 700,
+  },
+  successName: { margin: 0, fontSize: '3rem', color: '#fff' },
+  successMsg: { color: '#dcfce7', fontSize: '1.5rem', marginTop: '0.5rem' },
+  successTime: { color: '#bbf7d0', fontSize: '2rem', fontVariantNumeric: 'tabular-nums', marginTop: '0.4rem' },
+
+  failIcon: {
+    fontSize: '6rem',
+    width: 140, height: 140, lineHeight: '140px',
+    borderRadius: '50%',
+    background: 'rgba(255,255,255,0.15)',
+    color: '#fff',
+    marginBottom: '1.5rem',
+    fontWeight: 700,
+  },
+  failTitle: { margin: 0, fontSize: '2.5rem', color: '#fff' },
+  failMsg: { color: '#fee2e2', fontSize: '1.25rem', marginTop: '0.4rem' },
+
+  devBar: {
+    display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap',
+    padding: '0.6rem 1.25rem', background: '#020617', borderTop: '1px solid #1e293b',
+  },
+  devLabel: { color: '#64748b', fontSize: '0.75rem', marginRight: '0.5rem' },
+  devBtn: {
+    padding: '0.3rem 0.7rem', fontSize: '0.75rem',
+    background: '#1e293b', color: '#cbd5e1',
+    border: '1px solid #334155', borderRadius: 4,
+  },
+  devBtnActive: { background: '#2563eb', color: '#fff', borderColor: '#2563eb' },
+};

@@ -7,7 +7,23 @@
       "Bash(git add *)",
       "Bash(git rm *)",
       "Bash(git commit -m ' *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(firebase --version)",
+      "Bash(npm run *)",
+      "Bash(firebase deploy *)",
+      "Bash(node -e \"const fs=require\\('fs'\\);const c=JSON.parse\\(fs.readFileSync\\('/c/Users/joseph/.config/configstore/firebase-tools.json','utf8'\\)\\);console.log\\('keys:',Object.keys\\(c\\)\\);console.log\\('user:',c.user?.email||'none'\\);console.log\\('hasTokens:',!!c.tokens\\);console.log\\('hasRefresh:',!!c.tokens?.refresh_token\\);\")",
+      "Bash(gcloud --version)",
+      "Bash(gcloud auth *)",
+      "Bash(echo \"===EXIT: $?===\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Read(//tmp/**)",
+      "Bash(firebase login:list)",
+      "Bash(echo \"---EXIT $?---\")",
+      "Bash(npm root *)",
+      "Bash(node scripts/seed-admin.mjs)",
+      "Bash(node scripts/enable-email-auth.mjs)",
+      "Bash(curl -sI https://ithink-sams.web.app)",
+      "Bash(git reset *)"
     ]
   }
 }

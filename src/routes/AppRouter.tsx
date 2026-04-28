@@ -58,7 +58,7 @@ export function AppRouter() {
         <Route
           path={ROUTES.kiosk()}
           element={
-            <AuthGuard>
+            <AuthGuard withLayout={false}>
               <KioskPage />
             </AuthGuard>
           }

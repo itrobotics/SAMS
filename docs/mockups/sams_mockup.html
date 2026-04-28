@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAMS UI Mockup</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f4f0; color: #1a1a1a; padding: 24px; }
+h2 { font-size: 13px; font-weight: 500; color: #888; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px; margin-top: 32px; }
+h2:first-child { margin-top: 0; }
+.card { background: #fff; border: 0.5px solid rgba(0,0,0,0.12); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; }
+.tag { display: inline-block; font-size: 11px; padding: 2px 9px; border-radius: 6px; font-weight: 500; }
+.tag-green { background: #eaf3de; color: #3B6D11; }
+.tag-amber { background: #FAEEDA; color: #854F0B; }
+.tag-gray { background: #f1efe8; color: #5F5E5A; }
+.tag-blue { background: #E6F1FB; color: #185FA5; }
+.tag-red { background: #FCEBEB; color: #A32D2D; }
+table { width: 100%; border-collapse: collapse; }
+th { font-size: 12px; font-weight: 500; color: #888; padding: 6px 10px; text-align: left; border-bottom: 0.5px solid rgba(0,0,0,0.1); }
+td { font-size: 13px; color: #1a1a1a; padding: 9px 10px; border-bottom: 0.5px solid rgba(0,0,0,0.07); }
+tr:last-child td { border-bottom: none; }
+button { cursor: pointer; }
+.metric { background: #f5f4f0; border-radius: 8px; padding: 10px 14px; text-align: center; }
+.metric-label { font-size: 11px; color: #888; margin-bottom: 4px; }
+.metric-val { font-size: 20px; font-weight: 500; }
+
+/* KIOSK */
+.kiosk-screen { border-radius: 12px; padding: 32px 20px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.kiosk-standby { background: #1a1a1a; }
+.kiosk-success { background: #0d1f0e; }
+.kiosk-warn { background: #1f1800; }
+.cam-frame { position: relative; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.corner { position: absolute; width: 18px; height: 18px; }
+.corner.tl { top: 8px; left: 8px; border-top: 2px solid; border-left: 2px solid; border-radius: 2px 0 0 0; }
+.corner.tr { top: 8px; right: 8px; border-top: 2px solid; border-right: 2px solid; border-radius: 0 2px 0 0; }
+.corner.bl { bottom: 8px; left: 8px; border-bottom: 2px solid; border-left: 2px solid; border-radius: 0 0 0 2px; }
+.corner.br { bottom: 8px; right: 8px; border-bottom: 2px solid; border-right: 2px solid; border-radius: 0 0 2px 0; }
+.corner-blue { border-color: #3a8fdf; }
+.corner-green { border-color: #4caf50; }
+.corner-amber { border-color: #e6a817; }
+
+/* Photo grid */
+.photo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.photo-card { border: 0.5px solid rgba(0,0,0,0.12); border-radius: 8px; overflow: hidden; }
+.photo-thumb { height: 72px; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+.photo-info { padding: 6px 8px; }
+.add-slot { border: 2px dashed rgba(0,0,0,0.15); border-radius: 8px; height: 118px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; }
+
+.section-divider { height: 1px; background: rgba(0,0,0,0.08); margin: 8px 0 24px; }
+</style>
+</head>
+<body>
+
+<!-- ===================== KIOSK ===================== -->
+<h2>Kiosk — 自助報到畫面</h2>
+<div style="display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 32px;">
+
+  <!-- Standby -->
+  <div>
+    <p style="font-size:12px;color:#888;margin-bottom:8px;">待機狀態</p>
+    <div class="kiosk-screen kiosk-standby">
+      <div style="font-size:12px;color:#777;letter-spacing:.04em;">ICE SAMS — 安和分校</div>
+      <div class="cam-frame" style="width:180px;height:180px;background:#111;border:2px solid #2a2a2a;">
+        <div class="corner tl corner-blue"></div>
+        <div class="corner tr corner-blue"></div>
+        <div class="corner bl corner-blue"></div>
+        <div class="corner br corner-blue"></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <span style="font-size:11px;color:#444;">webcam</span>
+        </div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:18px;font-weight:500;color:#fff;margin-bottom:4px;">請站到鏡頭前</div>
+        <div style="font-size:12px;color:#666;">Ready to check-in</div>
+      </div>
+      <div style="font-size:11px;color:#444;">09:12:34</div>
+    </div>
+  </div>
+
+  <!-- Success -->
+  <div>
+    <p style="font-size:12px;color:#888;margin-bottom:8px;">辨識成功</p>
+    <div class="kiosk-screen kiosk-success">
+      <div style="font-size:12px;color:#5ca85e;letter-spacing:.04em;">ICE SAMS — 安和分校</div>
+      <div class="cam-frame" style="width:180px;height:180px;background:#111;border:2px solid #2d6e30;">
+        <div class="corner tl corner-green"></div>
+        <div class="corner tr corner-green"></div>
+        <div class="corner bl corner-green"></div>
+        <div class="corner br corner-green"></div>
+        <div style="width:60px;height:60px;border-radius:50%;background:#1a3d1b;border:2px solid #3d8f40;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:500;color:#5ca85e;">王</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:14px;color:#5ca85e;margin-bottom:4px;">早安，王小明！</div>
+        <div style="font-size:22px;font-weight:500;color:#fff;margin-bottom:4px;">報到成功</div>
+        <div style="font-size:13px;color:#5ca85e;">09:12:41</div>
+      </div>
+      <div style="background:#1a3d1b;border:0.5px solid #2d6e30;border-radius:6px;padding:5px 14px;font-size:11px;color:#5ca85e;">信心值 91% · Scratch 初階班</div>
+    </div>
+  </div>
+
+  <!-- Confirm -->
+  <div>
+    <p style="font-size:12px;color:#888;margin-bottom:8px;">需老師確認（信心值 70–84%）</p>
+    <div class="kiosk-screen kiosk-warn">
+      <div style="font-size:12px;color:#c9921a;letter-spacing:.04em;">ICE SAMS — 安和分校</div>
+      <div class="cam-frame" style="width:180px;height:180px;background:#111;border:2px solid #6e5000;">
+        <div class="corner tl corner-amber"></div>
+        <div class="corner tr corner-amber"></div>
+        <div class="corner bl corner-amber"></div>
+        <div class="corner br corner-amber"></div>
+        <div style="width:60px;height:60px;border-radius:50%;background:#2a1f00;border:2px solid #8a6800;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:500;color:#d4a017;">?</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:16px;font-weight:500;color:#d4a017;margin-bottom:4px;">請老師確認身分</div>
+        <div style="font-size:12px;color:#8a6800;">信心值 77% — 最接近：王小明</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button style="background:#1a3d1b;border:0.5px solid #2d6e30;color:#5ca85e;border-radius:6px;padding:7px 14px;font-size:12px;">確認是王小明</button>
+        <button style="background:#1f1800;border:0.5px solid #6e5000;color:#d4a017;border-radius:6px;padding:7px 14px;font-size:12px;">選其他學生</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== FACE ADMIN ===================== -->
+<h2>學生人臉管理（管理員）</h2>
+<div class="card">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:0.5px solid rgba(0,0,0,0.1);">
+    <div style="width:40px;height:40px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:14px;color:#185FA5;">王</div>
+    <div>
+      <p style="font-weight:500;font-size:15px;">王小明</p>
+      <p style="font-size:12px;color:#888;">S001 · 安和分校 · 小三</p>
+    </div>
+    <div style="margin-left:auto;">
+      <button style="font-size:12px;padding:6px 14px;border-radius:6px;border:0.5px solid rgba(0,0,0,0.2);background:transparent;color:#1a1a1a;">+ 新增照片</button>
+    </div>
+  </div>
+  <p style="font-size:12px;color:#888;margin-bottom:12px;">已註冊人臉照片（3 / 5 張）</p>
+  <div class="photo-grid">
+    <div class="photo-card">
+      <div class="photo-thumb" style="background:#d3d1c7;color:#5F5E5A;">正面</div>
+      <div class="photo-info">
+        <div style="font-size:10px;color:#888;">品質</div>
+        <div style="font-size:13px;font-weight:500;color:#3B6D11;">0.91</div>
+        <div style="font-size:10px;color:#aaa;margin-top:2px;">2026-03-10</div>
+        <button style="font-size:10px;color:#A32D2D;border:none;background:none;padding:2px 0;margin-top:2px;">刪除</button>
+      </div>
+    </div>
+    <div class="photo-card">
+      <div class="photo-thumb" style="background:#b4b2a9;color:#444441;">左轉</div>
+      <div class="photo-info">
+        <div style="font-size:10px;color:#888;">品質</div>
+        <div style="font-size:13px;font-weight:500;color:#3B6D11;">0.87</div>
+        <div style="font-size:10px;color:#aaa;margin-top:2px;">2026-03-10</div>
+        <button style="font-size:10px;color:#A32D2D;border:none;background:none;padding:2px 0;margin-top:2px;">刪除</button>
+      </div>
+    </div>
+    <div class="photo-card">
+      <div class="photo-thumb" style="background:#888780;color:#f5f4f0;">右轉</div>
+      <div class="photo-info">
+        <div style="font-size:10px;color:#888;">品質</div>
+        <div style="font-size:13px;font-weight:500;color:#854F0B;">0.78</div>
+        <div style="font-size:10px;color:#aaa;margin-top:2px;">2026-03-10</div>
+        <button style="font-size:10px;color:#A32D2D;border:none;background:none;padding:2px 0;margin-top:2px;">刪除</button>
+      </div>
+    </div>
+    <div class="add-slot">
+      <span style="font-size:22px;color:#bbb;">+</span>
+      <span style="font-size:10px;color:#aaa;">上傳</span>
+    </div>
+    <div class="add-slot">
+      <span style="font-size:22px;color:#bbb;">+</span>
+      <span style="font-size:10px;color:#aaa;">上傳</span>
+    </div>
+  </div>
+  <div style="margin-top:14px;padding-top:12px;border-top:0.5px solid rgba(0,0,0,0.1);display:flex;justify-content:flex-end;">
+    <button style="font-size:12px;padding:6px 14px;border-radius:6px;border:0.5px solid #f09595;background:transparent;color:#A32D2D;">全部刪除並重新上傳</button>
+  </div>
+</div>
+
+<!-- ===================== BRANCH DASHBOARD ===================== -->
+<h2>Branch Dashboard — 安和分校今日</h2>
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div>
+      <p style="font-size:15px;font-weight:500;">安和分校</p>
+      <p style="font-size:12px;color:#888;">2026-04-28（一）</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+      <div class="metric"><div class="metric-label">應到</div><div class="metric-val" style="color:#1a1a1a;">32</div></div>
+      <div class="metric" style="background:#eaf3de;"><div class="metric-label" style="color:#3B6D11;">已到</div><div class="metric-val" style="color:#3B6D11;">21</div></div>
+      <div class="metric" style="background:#FAEEDA;"><div class="metric-label" style="color:#854F0B;">遲到</div><div class="metric-val" style="color:#854F0B;">2</div></div>
+      <div class="metric" style="background:#FCEBEB;"><div class="metric-label" style="color:#A32D2D;">未到</div><div class="metric-val" style="color:#A32D2D;">9</div></div>
+    </div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>班級</th><th style="text-align:center;">應到</th><th style="text-align:center;">已到</th><th style="text-align:center;">遲到</th><th style="text-align:center;">請假</th><th style="text-align:center;">未到</th><th>狀態</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td><span style="font-weight:500;">Scratch 初階班</span><br><span style="font-size:11px;color:#888;">17:00–18:30 · 林老師</span></td>
+        <td style="text-align:center;">12</td><td style="text-align:center;color:#3B6D11;font-weight:500;">10</td><td style="text-align:center;color:#854F0B;">1</td><td style="text-align:center;">1</td><td style="text-align:center;color:#A32D2D;">0</td>
+        <td><span class="tag tag-green">進行中</span></td>
+      </tr>
+      <tr>
+        <td><span style="font-weight:500;">Python 進階班</span><br><span style="font-size:11px;color:#888;">18:30–20:00 · 陳老師</span></td>
+        <td style="text-align:center;">10</td><td style="text-align:center;color:#3B6D11;font-weight:500;">7</td><td style="text-align:center;color:#854F0B;">1</td><td style="text-align:center;">0</td><td style="text-align:center;color:#A32D2D;">2</td>
+        <td><span class="tag tag-green">進行中</span></td>
+      </tr>
+      <tr>
+        <td><span style="font-weight:500;">AI 創作班</span><br><span style="font-size:11px;color:#888;">14:00–15:30 · 王老師</span></td>
+        <td style="text-align:center;">10</td><td style="text-align:center;">10</td><td style="text-align:center;">0</td><td style="text-align:center;">0</td><td style="text-align:center;">0</td>
+        <td><span class="tag tag-gray">已結束</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ===================== SESSION PAGE ===================== -->
+<h2>Session Page — Scratch 初階班出席表</h2>
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div>
+      <p style="font-size:15px;font-weight:500;">Scratch 初階班</p>
+      <p style="font-size:12px;color:#888;">2026-04-28 · 17:00–18:30 · 安和分校</p>
+    </div>
+    <span class="tag tag-green">進行中</span>
+  </div>
+  <table>
+    <thead><tr><th>學生</th><th>狀態</th><th>時間</th><th>方式</th><th style="text-align:right;">操作</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>王小明</td>
+        <td><span class="tag tag-green">已到</span></td>
+        <td style="font-size:12px;color:#888;">17:03:12</td>
+        <td style="font-size:12px;color:#888;">人臉</td>
+        <td style="text-align:right;"><button style="font-size:11px;padding:3px 8px;border-radius:6px;border:0.5px solid rgba(0,0,0,0.2);background:transparent;color:#888;">重設</button></td>
+      </tr>
+      <tr>
+        <td>李大華</td>
+        <td><span class="tag tag-amber">遲到</span></td>
+        <td style="font-size:12px;color:#888;">17:18:44</td>
+        <td style="font-size:12px;color:#888;">人臉</td>
+        <td style="text-align:right;"><button style="font-size:11px;padding:3px 8px;border-radius:6px;border:0.5px solid rgba(0,0,0,0.2);background:transparent;color:#888;">重設</button></td>
+      </tr>
+      <tr>
+        <td>陳美玲</td>
+        <td><span class="tag tag-blue">請假</span></td>
+        <td style="font-size:12px;color:#888;">—</td>
+        <td style="font-size:12px;color:#888;">—</td>
+        <td style="text-align:right;"><button style="font-size:11px;padding:3px 8px;border-radius:6px;border:0.5px solid rgba(0,0,0,0.2);background:transparent;color:#888;">重設</button></td>
+      </tr>
+      <tr>
+        <td>張志豪</td>
+        <td><span class="tag tag-gray">未到</span></td>
+        <td style="font-size:12px;color:#888;">—</td>
+        <td style="font-size:12px;color:#888;">—</td>
+        <td style="text-align:right;display:flex;gap:4px;justify-content:flex-end;">
+          <button style="font-size:11px;padding:3px 8px;border-radius:6px;border:0.5px solid #c0dd97;background:transparent;color:#3B6D11;">報到</button>
+          <button style="font-size:11px;padding:3px 8px;border-radius:6px;border:0.5px solid #B5D4F4;background:transparent;color:#185FA5;">請假</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>

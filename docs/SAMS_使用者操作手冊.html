@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ICE SAMS 使用者操作手冊 v1.0</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif; background: #f5f4f0; color: #1a1a1a; font-size: 14px; line-height: 1.7; }
+
+/* Layout */
+.sidebar { position: fixed; top: 0; left: 0; width: 220px; height: 100vh; background: #fff; border-right: 0.5px solid rgba(0,0,0,0.1); padding: 24px 0; overflow-y: auto; z-index: 100; }
+.sidebar-logo { padding: 0 20px 20px; border-bottom: 0.5px solid rgba(0,0,0,0.08); margin-bottom: 16px; }
+.sidebar-logo h1 { font-size: 15px; font-weight: 600; color: #1a1a1a; }
+.sidebar-logo p { font-size: 11px; color: #888; margin-top: 2px; }
+.sidebar nav a { display: block; padding: 6px 20px; font-size: 13px; color: #555; text-decoration: none; border-left: 2px solid transparent; }
+.sidebar nav a:hover { color: #1a1a1a; background: #f5f4f0; }
+.sidebar nav a.active { color: #185FA5; border-left-color: #185FA5; font-weight: 500; }
+.sidebar nav .nav-group { font-size: 10px; color: #aaa; letter-spacing: 0.08em; text-transform: uppercase; padding: 12px 20px 4px; }
+
+.main { margin-left: 220px; padding: 40px 48px; max-width: 960px; }
+
+/* Sections */
+.page-header { margin-bottom: 40px; padding-bottom: 24px; border-bottom: 0.5px solid rgba(0,0,0,0.1); }
+.page-header .badge { display: inline-block; background: #E6F1FB; color: #185FA5; font-size: 11px; padding: 3px 10px; border-radius: 100px; margin-bottom: 10px; font-weight: 500; }
+.page-header h1 { font-size: 28px; font-weight: 600; color: #1a1a1a; margin-bottom: 6px; }
+.page-header p { color: #666; font-size: 14px; }
+
+section { margin-bottom: 56px; }
+section h2 { font-size: 20px; font-weight: 600; color: #1a1a1a; margin-bottom: 8px; padding-bottom: 10px; border-bottom: 0.5px solid rgba(0,0,0,0.1); }
+section h3 { font-size: 15px; font-weight: 600; color: #1a1a1a; margin: 24px 0 10px; }
+section p { color: #444; margin-bottom: 12px; line-height: 1.75; }
+
+/* Mockup screens */
+.screen { background: #fff; border: 0.5px solid rgba(0,0,0,0.12); border-radius: 10px; overflow: hidden; margin: 20px 0; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.screen-bar { background: #f0efe8; padding: 10px 16px; display: flex; align-items: center; gap: 8px; border-bottom: 0.5px solid rgba(0,0,0,0.08); }
+.screen-bar .dot { width: 10px; height: 10px; border-radius: 50%; }
+.screen-bar .url { flex: 1; background: #fff; border-radius: 4px; padding: 3px 10px; font-size: 11px; color: #888; margin: 0 8px; }
+.screen-body { padding: 0; }
+
+/* Nav bar */
+.app-nav { background: #1a1a2e; padding: 0 20px; display: flex; align-items: center; gap: 20px; height: 44px; }
+.app-nav .brand { font-size: 13px; font-weight: 600; color: #fff; letter-spacing: .04em; }
+.app-nav a { font-size: 12px; color: rgba(255,255,255,0.6); text-decoration: none; padding: 4px 0; }
+.app-nav a.active { color: #fff; border-bottom: 2px solid #4a8fe8; }
+.app-nav .logout { margin-left: auto; font-size: 12px; color: rgba(255,255,255,0.5); }
+
+/* Page content */
+.page-content { padding: 20px 24px; }
+.page-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+.page-sub { font-size: 12px; color: #888; margin-bottom: 20px; }
+
+/* Cards */
+.card { background: #fff; border: 0.5px solid rgba(0,0,0,0.1); border-radius: 8px; padding: 14px 18px; }
+
+/* Tables */
+.mock-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mock-table th { background: #f8f7f3; font-size: 11px; font-weight: 500; color: #888; padding: 8px 12px; text-align: left; border-bottom: 0.5px solid rgba(0,0,0,0.1); }
+.mock-table td { padding: 10px 12px; border-bottom: 0.5px solid rgba(0,0,0,0.06); color: #333; vertical-align: middle; }
+.mock-table tr:last-child td { border-bottom: none; }
+.mock-table tr:hover td { background: #faf9f5; }
+
+/* Tags */
+.tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
+.tag-green { background: #eaf3de; color: #3B6D11; }
+.tag-amber { background: #FAEEDA; color: #854F0B; }
+.tag-gray { background: #f1efe8; color: #5F5E5A; }
+.tag-blue { background: #E6F1FB; color: #185FA5; }
+.tag-red { background: #FCEBEB; color: #A32D2D; }
+
+/* Buttons */
+.btn { display: inline-block; padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 0.5px solid; }
+.btn-primary { background: #185FA5; color: #fff; border-color: #185FA5; }
+.btn-outline { background: transparent; color: #333; border-color: rgba(0,0,0,0.2); }
+.btn-sm { padding: 4px 10px; font-size: 11px; }
+
+/* Form */
+.form-group { margin-bottom: 14px; }
+.form-label { font-size: 12px; color: #666; margin-bottom: 4px; display: block; }
+.form-input { width: 100%; border: 0.5px solid rgba(0,0,0,0.2); border-radius: 6px; padding: 8px 12px; font-size: 13px; color: #333; background: #fff; }
+
+/* Step callouts */
+.steps { counter-reset: step; }
+.step { display: flex; gap: 14px; margin-bottom: 16px; align-items: flex-start; }
+.step-num { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: #185FA5; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+.step-body { flex: 1; }
+.step-title { font-weight: 500; color: #1a1a1a; font-size: 14px; }
+.step-desc { font-size: 13px; color: #666; margin-top: 2px; }
+
+/* Info box */
+.info-box { background: #E6F1FB; border-left: 3px solid #185FA5; border-radius: 0 6px 6px 0; padding: 12px 16px; margin: 16px 0; font-size: 13px; color: #185FA5; }
+.warn-box { background: #FAEEDA; border-left: 3px solid #e6a817; border-radius: 0 6px 6px 0; padding: 12px 16px; margin: 16px 0; font-size: 13px; color: #854F0B; }
+
+/* Role table */
+.role-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+.role-card { border: 0.5px solid rgba(0,0,0,0.1); border-radius: 8px; padding: 14px; background: #fff; }
+.role-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; margin-bottom: 10px; }
+.role-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.role-desc { font-size: 11px; color: #888; line-height: 1.5; }
+
+/* Metric row */
+.metric-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 12px 0; }
+.metric { background: #f5f4f0; border-radius: 8px; padding: 10px 14px; text-align: center; }
+.metric-label { font-size: 11px; color: #888; margin-bottom: 4px; }
+.metric-val { font-size: 22px; font-weight: 600; }
+
+/* Flow diagram */
+.flow { display: flex; align-items: center; gap: 0; margin: 20px 0; flex-wrap: wrap; }
+.flow-box { background: #fff; border: 0.5px solid rgba(0,0,0,0.15); border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.flow-box.highlight { background: #E6F1FB; border-color: #185FA5; color: #185FA5; }
+.flow-arrow { color: #bbb; font-size: 18px; padding: 0 8px; }
+
+/* Cover */
+.cover { min-height: 300px; background: #1a1a2e; border-radius: 12px; padding: 48px; margin-bottom: 48px; color: #fff; display: flex; flex-direction: column; justify-content: flex-end; }
+.cover-tag { font-size: 11px; color: rgba(255,255,255,0.5); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; }
+.cover h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+.cover h2 { font-size: 16px; font-weight: 400; color: rgba(255,255,255,0.6); margin-bottom: 24px; }
+.cover-meta { display: flex; gap: 24px; font-size: 12px; color: rgba(255,255,255,0.4); border-top: 0.5px solid rgba(255,255,255,0.15); padding-top: 20px; margin-top: 20px; }
+
+/* Avatar */
+.avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+.avatar-blue { background: #E6F1FB; color: #185FA5; }
+.avatar-green { background: #eaf3de; color: #3B6D11; }
+.avatar-amber { background: #FAEEDA; color: #854F0B; }
+
+@media print {
+  .sidebar { display: none; }
+  .main { margin-left: 0; padding: 24px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <h1>ICE SAMS</h1>
+    <p>使用者操作手冊 v1.0</p>
+  </div>
+  <nav>
+    <div class="nav-group">概覽</div>
+    <a href="#overview">系統概覽</a>
+    <a href="#roles">角色與權限</a>
+    <div class="nav-group">基本操作</div>
+    <a href="#login">登入</a>
+    <a href="#branches">分校管理</a>
+    <a href="#students">學生管理</a>
+    <a href="#classes">班級管理</a>
+    <div class="nav-group">日常作業</div>
+    <a href="#sessions">產生今日場次</a>
+    <a href="#dashboard">分校 Dashboard</a>
+    <a href="#attendance">出席管理</a>
+  </nav>
+</div>
+
+<!-- Main content -->
+<div class="main">
+
+  <!-- Cover -->
+  <div class="cover">
+    <div class="cover-tag">ICE Student Arrival Management System</div>
+    <h1>SAMS 操作手冊</h1>
+    <h2>學生到校管理系統 — 使用者操作指南</h2>
+    <div class="cover-meta">
+      <span>版本 v1.0</span>
+      <span>2026-04-28</span>
+      <span>適用：HQ Admin / Branch Admin / Teacher / Staff</span>
+    </div>
+  </div>
+
+  <!-- System Overview -->
+  <section id="overview">
+    <h2>系統概覽</h2>
+    <p>ICE SAMS 是一套多分校補習班學生到校管理系統，功能類似診所報到系統：學生到校後完成報到，老師與總部即時看到誰到了、誰沒來、誰請假。</p>
+
+    <h3>主要作業流程</h3>
+    <div class="flow">
+      <div class="flow-box">排課設定</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box highlight">每日產生場次</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">建立應到名單</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box highlight">學生到校報到</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">更新出席狀態</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box highlight">Dashboard 即時顯示</div>
+    </div>
+
+    <h3>系統入口</h3>
+    <div class="info-box">
+      正式網址：<strong>https://ithink-sams.web.app</strong><br>
+      支援瀏覽器：Chrome、Edge（建議使用 Chrome）
+    </div>
+
+    <h3>主要功能模組</h3>
+    <table class="mock-table" style="margin-top:8px;">
+      <thead><tr><th>模組</th><th>功能說明</th><th>可用角色</th></tr></thead>
+      <tbody>
+        <tr><td><strong>分校管理</strong></td><td>新增、停用分校，指派管理者</td><td><span class="tag tag-blue">HQ Admin</span></td></tr>
+        <tr><td><strong>學生管理</strong></td><td>新增、編輯、停用學生資料</td><td><span class="tag tag-blue">HQ Admin</span> <span class="tag tag-green">Branch Admin</span></td></tr>
+        <tr><td><strong>班級管理</strong></td><td>建立班級、排課、管理學生名單</td><td><span class="tag tag-blue">HQ Admin</span> <span class="tag tag-green">Branch Admin</span></td></tr>
+        <tr><td><strong>場次產生</strong></td><td>每日自動產生應到名單</td><td>自動執行</td></tr>
+        <tr><td><strong>分校 Dashboard</strong></td><td>今日課程到班即時狀況</td><td>全角色</td></tr>
+        <tr><td><strong>出席管理</strong></td><td>手動報到、改狀態（請假/未到）</td><td><span class="tag tag-green">Branch Admin</span> <span class="tag tag-amber">Teacher</span> <span class="tag tag-gray">Staff</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Roles -->
+  <section id="roles">
+    <h2>角色與權限</h2>
+    <p>系統依職責分為四種角色，登入後自動套用對應權限。</p>
+
+    <div class="role-grid">
+      <div class="role-card">
+        <div class="role-icon" style="background:#E6F1FB;">👑</div>
+        <div class="role-name" style="color:#185FA5;">HQ Admin</div>
+        <div class="role-desc">總部管理員。可看所有分校資料、建立分校、管理使用者帳號。</div>
+      </div>
+      <div class="role-card">
+        <div class="role-icon" style="background:#eaf3de;">🏫</div>
+        <div class="role-name" style="color:#3B6D11;">Branch Admin</div>
+        <div class="role-desc">分校管理員。只能看到所屬分校，可管理學生、班級、出席。</div>
+      </div>
+      <div class="role-card">
+        <div class="role-icon" style="background:#FAEEDA;">📚</div>
+        <div class="role-name" style="color:#854F0B;">Teacher</div>
+        <div class="role-desc">老師。只能看到自己負責的班級與出席記錄。</div>
+      </div>
+      <div class="role-card">
+        <div class="role-icon" style="background:#f1efe8;">🖥️</div>
+        <div class="role-name" style="color:#5F5E5A;">Staff</div>
+        <div class="role-desc">行政人員。可執行報到、協助處理請假，但不可修改課程設定。</div>
+      </div>
+    </div>
+
+    <h3>權限對照表</h3>
+    <table class="mock-table">
+      <thead><tr><th>功能</th><th>HQ Admin</th><th>Branch Admin</th><th>Teacher</th><th>Staff</th></tr></thead>
+      <tbody>
+        <tr><td>查看所有分校</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
+        <tr><td>新增/停用分校</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
+        <tr><td>管理學生資料</td><td>✅</td><td>✅（本分校）</td><td>❌</td><td>❌</td></tr>
+        <tr><td>管理班級</td><td>✅</td><td>✅（本分校）</td><td>❌</td><td>❌</td></tr>
+        <tr><td>查看 Dashboard</td><td>✅</td><td>✅（本分校）</td><td>✅（自己班級）</td><td>✅（本分校）</td></tr>
+        <tr><td>手動報到 / 改狀態</td><td>✅</td><td>✅</td><td>✅（自己班級）</td><td>✅</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Login -->
+  <section id="login">
+    <h2>登入</h2>
+    <p>開啟系統網址後，進入登入頁面。輸入帳號（Email）與密碼即可登入，系統會依角色自動導向對應的首頁。</p>
+
+    <div class="screen">
+      <div class="screen-bar">
+        <div class="dot" style="background:#ff5f57;"></div>
+        <div class="dot" style="background:#febc2e;"></div>
+        <div class="dot" style="background:#28c840;"></div>
+        <div class="url">https://ithink-sams.web.app/login</div>
+      </div>
+      <div class="screen-body" style="display:flex;justify-content:center;align-items:center;min-height:320px;background:#f5f4f0;">
+        <div style="background:#fff;border-radius:12px;padding:36px;width:340px;border:0.5px solid rgba(0,0,0,0.1);">
+          <div style="text-align:center;margin-bottom:28px;">
+            <div style="font-size:18px;font-weight:700;color:#1a1a2e;">ICE SAMS</div>
+            <div style="font-size:12px;color:#888;margin-top:4px;">學生到校管理系統</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <div class="form-input" style="color:#888;">admin@ithink-sams.com</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">密碼</label>
+            <div class="form-input" style="color:#888;">••••••••••</div>
+          </div>
+          <div style="margin-top:20px;">
+            <div class="btn btn-primary" style="width:100%;text-align:center;display:block;padding:10px;">登入</div>
+          </div>
+          <div style="text-align:center;font-size:12px;color:#aaa;margin-top:14px;">請聯絡管理員申請帳號</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>登入後跳轉規則</h3>
+    <table class="mock-table">
+      <thead><tr><th>角色</th><th>登入後自動跳到</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag tag-blue">HQ Admin</span></td><td>/hq-dashboard（總部儀表板）</td></tr>
+        <tr><td><span class="tag tag-green">Branch Admin</span></td><td>/branch-dashboard/[所屬分校]</td></tr>
+        <tr><td><span class="tag tag-amber">Teacher</span></td><td>/branch-dashboard/[所屬分校]</td></tr>
+        <tr><td><span class="tag tag-gray">Staff</span></td><td>/branch-dashboard/[所屬分校]</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warn-box">帳號由 HQ Admin 在 Firebase Console 建立，如需申請帳號請聯絡總部。</div>
+  </section>
+
+  <!-- Branches -->
+  <section id="branches">
+    <h2>分校管理</h2>
+    <p>僅 HQ Admin 可操作。用來新增分校、停用分校、查看各分校狀態。</p>
+
+    <div class="screen">
+      <div class="screen-bar">
+        <div class="dot" style="background:#ff5f57;"></div>
+        <div class="dot" style="background:#febc2e;"></div>
+        <div class="dot" style="background:#28c840;"></div>
+        <div class="url">https://ithink-sams.web.app/branches</div>
+      </div>
+      <div class="screen-body">
+        <div class="app-nav">
+          <span class="brand">ICE SAMS</span>
+          <a href="#">分校</a>
+          <a href="#">學生</a>
+          <a href="#">班級</a>
+          <a href="#">設定</a>
+          <span class="logout">登出</span>
+        </div>
+        <div class="page-content">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+            <div>
+              <div class="page-title">分校管理</div>
+              <div class="page-sub">管理所有分校資料</div>
+            </div>
+            <div class="btn btn-primary">+ 新增分校</div>
+          </div>
+          <table class="mock-table">
+            <thead><tr><th>分校 ID</th><th>分校名稱</th><th>地址</th><th>狀態</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr>
+                <td style="font-family:monospace;font-size:12px;color:#888;">anhe</td>
+                <td><strong>安和分校</strong></td>
+                <td style="font-size:12px;color:#666;">台北市大安區安和路一段...</td>
+                <td><span class="tag tag-green">啟用</span></td>
+                <td><span class="btn btn-outline btn-sm">編輯</span></td>
+              </tr>
+              <tr>
+                <td style="font-family:monospace;font-size:12px;color:#888;">dazhi</td>
+                <td><strong>大直分校</strong></td>
+                <td style="font-size:12px;color:#666;">台北市中山區北安路...</td>
+                <td><span class="tag tag-green">啟用</span></td>
+                <td><span class="btn btn-outline btn-sm">編輯</span></td>
+              </tr>
+              <tr>
+                <td style="font-family:monospace;font-size:12px;color:#888;">neihu</td>
+                <td><strong>內湖分校</strong></td>
+                <td style="font-size:12px;color:#666;">台北市內湖區內湖路...</td>
+                <td><span class="tag tag-gray">停用</span></td>
+                <td><span class="btn btn-outline btn-sm">編輯</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <h3>新增分校步驟</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">點選「+ 新增分校」</div><div class="step-desc">右上角按鈕，開啟新增表單。</div></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">填入分校 ID</div><div class="step-desc">用英文小寫，不可含空格（例：anhe, dazhi），建立後無法更改。</div></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">填入名稱與地址</div><div class="step-desc">填入顯示用的中文名稱與地址。</div></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">儲存</div><div class="step-desc">點「儲存」完成，分校立即出現在列表中。</div></div></div>
+    </div>
+  </section>
+
+  <!-- Students -->
+  <section id="students">
+    <h2>學生管理</h2>
+    <p>新增及管理學生基本資料。Branch Admin 只能管理本分校的學生。</p>
+
+    <div class="screen">
+      <div class="screen-bar">
+        <div class="dot" style="background:#ff5f57;"></div>
+        <div class="dot" style="background:#febc2e;"></div>
+        <div class="dot" style="background:#28c840;"></div>
+        <div class="url">https://ithink-sams.web.app/students</div>
+      </div>
+      <div class="screen-body">
+        <div class="app-nav">
+          <span class="brand">ICE SAMS</span>
+          <a href="#">分校</a>
+          <a href="#" class="active">學生</a>
+          <a href="#">班級</a>
+          <a href="#">設定</a>
+          <span class="logout">登出</span>
+        </div>
+        <div class="page-content">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+            <div>
+              <div class="page-title">學生管理</div>
+              <div class="page-sub">共 47 位學生</div>
+            </div>
+            <div class="btn btn-primary">+ 新增學生</div>
+          </div>
+          <!-- Filters -->
+          <div style="display:flex;gap:10px;margin-bottom:16px;">
+            <div class="form-input" style="width:160px;font-size:12px;color:#888;">分校：安和分校 ▾</div>
+            <div class="form-input" style="width:120px;font-size:12px;color:#888;">年級：全部 ▾</div>
+            <div class="form-input" style="flex:1;font-size:12px;color:#bbb;">搜尋學生姓名...</div>
+          </div>
+          <table class="mock-table">
+            <thead><tr><th>學生 ID</th><th>姓名</th><th>年級</th><th>家長</th><th>聯絡電話</th><th>狀態</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr>
+                <td style="font-family:monospace;font-size:12px;color:#888;">S001</td>
+                <td><strong>王小明</strong></td>
+                <td>小三</td>
+                <td style="font-size:12px;color:#666;">王媽媽</td>
+                <td style="font-size:12px;color:#666;">0912-345-678</td>
+                <td><span class="tag tag-green">在籍</span></td>
+                <td style="display:flex;gap:6px;"><span class="btn btn-outline btn-sm">查看</span><span class="btn btn-outline btn-sm">編輯</span></td>
+              </tr>
+              <tr>
+                <td style="font-family:monospace;font-size:12px;color:#888;">S002</td>
+                <td><strong>李大華</strong></td>
+                <td>小四</td>
+                <td style="font-size:12px;color:#666;">李爸爸</td>
+                <td style="font-size:12px;color:#666;">0923-456-789</td>
+                <td><span class="tag tag-green">在籍</span></td>
+                <td style="display:flex;gap:6px;"><span class="btn btn-outline btn-sm">查看</span><span class="btn btn-outline btn-sm">編輯</span></td>
+              </tr>
+              <tr>
+                <td style="font-family:monospace;font-size:12px;color:#888;">S003</td>
+                <td><strong>陳美玲</strong></td>
+                <td>小五</td>
+                <td style="font-size:12px;color:#666;">陳媽媽</td>
+                <td style="font-size:12px;color:#666;">0934-567-890</td>
+                <td><span class="tag tag-gray">停用</span></td>
+                <td style="display:flex;gap:6px;"><span class="btn btn-outline btn-sm">查看</span><span class="btn btn-outline btn-sm">編輯</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <h3>新增學生步驟</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">點「+ 新增學生」</div><div class="step-desc">開啟新增表單。</div></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">填入基本資料</div><div class="step-desc">必填：姓名、年級、所屬分校。選填：家長姓名、聯絡電話。</div></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">儲存</div><div class="step-desc">Student ID 系統自動產生（S001, S002...），不需手動輸入。</div></div></div>
+    </div>
+
+    <div class="info-box">停用學生後，該學生不會出現在新的應到名單中，但歷史出席記錄保留。</div>
+  </section>
+
+  <!-- Classes -->
+  <section id="classes">
+    <h2>班級管理</h2>
+    <p>建立課程班級、設定上課時間、指派老師，並管理班級內的學生名單。</p>
+
+    <div class="screen">
+      <div class="screen-bar">
+        <div class="dot" style="background:#ff5f57;"></div>
+        <div class="dot" style="background:#febc2e;"></div>
+        <div class="dot" style="background:#28c840;"></div>
+        <div class="url">https://ithink-sams.web.app/classes</div>
+      </div>
+      <div class="screen-body">
+        <div class="app-nav">
+          <span class="brand">ICE SAMS</span>
+          <a href="#">分校</a>
+          <a href="#">學生</a>
+          <a href="#" class="active">班級</a>
+          <a href="#">設定</a>
+          <span class="logout">登出</span>
+        </div>
+        <div class="page-content">
+          <div style="display:flex;justify-content:space-between;margin-bottom:16px;">
+            <div>
+              <div class="page-title">班級管理</div>
+              <div class="page-sub">共 8 個班級</div>
+            </div>
+            <div class="btn btn-primary">+ 新增班級</div>
+          </div>
+          <table class="mock-table">
+            <thead><tr><th>班級名稱</th><th>分校</th><th>老師</th><th>上課時間</th><th>教室</th><th>學生數</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>Scratch 初階班</strong></td>
+                <td><span class="tag tag-blue">安和</span></td>
+                <td>林老師</td>
+                <td style="font-size:12px;color:#666;">週五 17:00–18:30</td>
+                <td style="font-size:12px;color:#666;">A101</td>
+                <td>12</td>
+                <td style="display:flex;gap:6px;"><span class="btn btn-outline btn-sm">名單</span><span class="btn btn-outline btn-sm">編輯</span></td>
+              </tr>
+              <tr>
+                <td><strong>Python 進階班</strong></td>
+                <td><span class="tag tag-blue">安和</span></td>
+                <td>陳老師</td>
+                <td style="font-size:12px;color:#666;">週三 18:30–20:00</td>
+                <td style="font-size:12px;color:#666;">B203</td>
+                <td>10</td>
+                <td style="display:flex;gap:6px;"><span class="btn btn-outline btn-sm">名單</span><span class="btn btn-outline btn-sm">編輯</span></td>
+              </tr>
+              <tr>
+                <td><strong>AI 創作班</strong></td>
+                <td><span class="tag tag-green">大直</span></td>
+                <td>王老師</td>
+                <td style="font-size:12px;color:#666;">週一 14:00–15:30</td>
+                <td style="font-size:12px;color:#666;">C301</td>
+                <td>10</td>
+                <td style="display:flex;gap:6px;"><span class="btn btn-outline btn-sm">名單</span><span class="btn btn-outline btn-sm">編輯</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <h3>新增班級步驟</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">點「+ 新增班級」</div><div class="step-desc">開啟新增表單。</div></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">填入班級資訊</div><div class="step-desc">班級名稱、所屬分校、負責老師、教室、上課星期（1-7）、開始與結束時間。</div></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">儲存後，設定學生名單</div><div class="step-desc">點「名單」按鈕，進入班級名單管理頁，從學生清單加入此班學生。</div></div></div>
+    </div>
+
+    <h3>管理學生名單</h3>
+    <p>點班級旁的「名單」按鈕，可在左欄（未加入學生）與右欄（班級成員）之間移動學生。</p>
+
+    <div class="screen">
+      <div class="screen-bar">
+        <div class="dot" style="background:#ff5f57;"></div>
+        <div class="dot" style="background:#febc2e;"></div>
+        <div class="dot" style="background:#28c840;"></div>
+        <div class="url">https://ithink-sams.web.app/classes/C001/roster</div>
+      </div>
+      <div class="screen-body">
+        <div class="app-nav"><span class="brand">ICE SAMS</span><a href="#" class="active">班級</a><span class="logout">登出</span></div>
+        <div class="page-content">
+          <div class="page-title" style="margin-bottom:4px;">Scratch 初階班 — 學生名單</div>
+          <div class="page-sub">安和分校 · 週五 17:00–18:30</div>
+          <div style="display:grid;grid-template-columns:1fr 40px 1fr;gap:12px;margin-top:16px;align-items:start;">
+            <div>
+              <div style="font-size:12px;font-weight:500;color:#888;margin-bottom:8px;">可加入學生（本分校）</div>
+              <table class="mock-table" style="border:0.5px solid rgba(0,0,0,0.1);border-radius:8px;overflow:hidden;">
+                <tr><td style="display:flex;justify-content:space-between;align-items:center;">陳美玲 <span class="btn btn-outline btn-sm" style="color:#185FA5;border-color:#B5D4F4;">加入 →</span></td></tr>
+                <tr><td style="display:flex;justify-content:space-between;align-items:center;">黃建國 <span class="btn btn-outline btn-sm" style="color:#185FA5;border-color:#B5D4F4;">加入 →</span></td></tr>
+                <tr><td style="display:flex;justify-content:space-between;align-items:center;">蔡小芬 <span class="btn btn-outline btn-sm" style="color:#185FA5;border-color:#B5D4F4;">加入 →</span></td></tr>
+              </table>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:center;padding-top:40px;">⇄</div>
+            <div>
+              <div style="font-size:12px;font-weight:500;color:#888;margin-bottom:8px;">班級成員（12 人）</div>
+              <table class="mock-table" style="border:0.5px solid rgba(0,0,0,0.1);border-radius:8px;overflow:hidden;">
+                <tr><td style="display:flex;justify-content:space-between;align-items:center;">王小明 <span class="btn btn-outline btn-sm" style="color:#A32D2D;border-color:#f09595;">移除</span></td></tr>
+                <tr><td style="display:flex;justify-content:space-between;align-items:center;">李大華 <span class="btn btn-outline btn-sm" style="color:#A32D2D;border-color:#f09595;">移除</span></td></tr>
+                <tr><td style="display:flex;justify-content:space-between;align-items:center;">張志豪 <span class="btn btn-outline btn-sm" style="color:#A32D2D;border-color:#f09595;">移除</span></td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sessions -->
+  <section id="sessions">
+    <h2>產生今日場次</h2>
+    <p>「場次」是每天課程的實例，系統需要先產生場次，才能開始記錄到班。正式上線後系統每日凌晨自動產生；目前可在設定頁手動觸發。</p>
+
+    <div class="info-box">每天第一次使用前，請先到「設定」頁點一次「產生今日場次」，確保今日課程已建立。</div>
+
+    <div class="screen">
+      <div class="screen-bar">
+        <div class="dot" style="background:#ff5f57;"></div>
+        <div class="dot" style="background:#febc2e;"></div>
+        <div class="dot" style="background:#28c840;"></div>
+        <div class="url">https://ithink-sams.web.app/settings</div>
+      </div>
+      <div class="screen-body">
+        <div class="app-nav"><span class="brand">ICE SAMS</span><a href="#">分校</a><a href="#">學生</a><a href="#">班級</a><a href="#" class="active">設定</a><span class="logout">登出</span></div>
+        <div class="page-content">
+          <div class="page-title" style="margin-bottom:4px;">系統設定</div>
+          <div class="page-sub">全域參數設定</div>
+          <div style="margin-top:20px;display:grid;gap:16px;">
+            <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-weight:500;margin-bottom:4px;">產生今日場次</div>
+                <div style="font-size:12px;color:#888;">依排課資料產生今天所有課程場次。已存在的場次不會重複產生。</div>
+              </div>
+              <div class="btn btn-primary">立即產生</div>
+            </div>
+            <div class="card">
+              <div style="font-weight:500;margin-bottom:12px;">出席判定規則</div>
+              <div class="form-group">
+                <label class="form-label">遲到判定（課程開始後幾分鐘算遲到）</label>
+                <div class="form-input" style="width:100px;">15 分鐘</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">報到開放時間（課程前幾分鐘開放報到）</label>
+                <div class="form-input" style="width:100px;">30 分鐘</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="warn-box">如果 Dashboard 上看不到今日課程，請確認是否已點「產生今日場次」。</div>
+  </section>
+
+  <!-- Dashboard -->
+  <section id="dashboard">
+    <h2>分校 Dashboard</h2>
+    <p>登入後的主要工作畫面。即時顯示今日各班的到班狀況，資料會自動更新，不需要手動重新整理。</p>
+
+    <div class="screen">
+      <div class="screen-bar">
+        <div class="dot" style="background:#ff5f57;"></div>
+        <div class="dot" style="background:#febc2e;"></div>
+        <div class="dot" style="background:#28c840;"></div>
+        <div class="url">https://ithink-sams.web.app/branch-dashboard/anhe</div>
+      </div>
+      <div class="screen-body">
+        <div class="app-nav"><span class="brand">ICE SAMS</span><a href="#" class="active">儀表板</a><a href="#">學生</a><a href="#">班級</a><a href="#">設定</a><span class="logout">登出</span></div>
+        <div class="page-content">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+            <div>
+              <div class="page-title">安和分校</div>
+              <div class="page-sub">2026-04-28（一） · 即時更新中</div>
+            </div>
+            <span class="tag tag-green" style="font-size:12px;padding:4px 12px;">● 連線中</span>
+          </div>
+
+          <!-- Metrics -->
+          <div class="metric-row" style="margin-bottom:24px;">
+            <div class="metric"><div class="metric-label">今日應到</div><div class="metric-val" style="color:#1a1a1a;">32</div></div>
+            <div class="metric" style="background:#eaf3de;"><div class="metric-label" style="color:#3B6D11;">已到</div><div class="metric-val" style="color:#3B6D11;">21</div></div>
+            <div class="metric" style="background:#FAEEDA;"><div class="metric-label" style="color:#854F0B;">遲到</div><div class="metric-val" style="color:#854F0B;">2</div></div>
+            <div class="metric" style="background:#FCEBEB;"><div class="metric-label" style="color:#A32D2D;">未到</div><div class="metric-val" style="color:#A32D2D;">9</div></div>
+          </div>
+
+          <!-- Class list -->
+          <table class="mock-table">
+            <thead><tr><th>班級</th><th style="text-align:center;">應到</th><th style="text-align:center;">已到</th><th style="text-align:center;">遲到</th><th style="text-align:center;">請假</th><th style="text-align:center;">未到</th><th>狀態</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><div style="font-weight:500;">Scratch 初階班</div><div style="font-size:11px;color:#888;">17:00–18:30 · 林老師 · A101</div></td>
+                <td style="text-align:center;">12</td>
+                <td style="text-align:center;color:#3B6D11;font-weight:600;">10</td>
+                <td style="text-align:center;color:#854F0B;">1</td>
+                <td style="text-align:center;">1</td>
+                <td style="text-align:center;color:#A32D2D;">0</td>
+                <td><span class="tag tag-green">進行中</span></td>
+                <td><span class="btn btn-outline btn-sm">查看出席</span></td>
+              </tr>
+              <tr>
+                <td><div style="font-weight:500;">Python 進階班</div><div style="font-size:11px;color:#888;">18:30–20:00 · 陳老師 · B203</div></td>
+                <td style="text-align:center;">10</td>
+                <td style="text-align:center;color:#3B6D11;font-weight:600;">7</td>
+                <td style="text-align:center;color:#854F0B;">1</td>
+                <td style="text-align:center;">0</td>
+                <td style="text-align:center;color:#A32D2D;">2</td>
+                <td><span class="tag tag-green">進行中</span></td>
+                <td><span class="btn btn-outline btn-sm">查看出席</span></td>
+              </tr>
+              <tr>
+                <td><div style="font-weight:500;">AI 創作班</div><div style="font-size:11px;color:#888;">14:00–15:30 · 王老師 · C301</div></td>
+                <td style="text-align:center;">10</td>
+                <td style="text-align:center;">10</td>
+                <td style="text-align:center;">0</td>
+                <td style="text-align:center;">0</td>
+                <td style="text-align:center;">0</td>
+                <td><span class="tag tag-gray">已結束</span></td>
+                <td><span class="btn btn-outline btn-sm">查看出席</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <h3>欄位說明</h3>
+    <table class="mock-table">
+      <thead><tr><th>欄位</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><strong>應到</strong></td><td>班級學生名單中所有在籍學生（扣掉已核准請假）</td></tr>
+        <tr><td><strong>已到</strong></td><td>已報到，且在遲到門檻時間內</td></tr>
+        <tr><td><strong>遲到</strong></td><td>已報到，但超過遲到門檻時間（預設課程開始後 15 分鐘）</td></tr>
+        <tr><td><strong>請假</strong></td><td>事先登錄請假，不列入未到</td></tr>
+        <tr><td><strong>未到</strong></td><td>課程進行中，尚未報到也未請假</td></tr>
+      </tbody>
+    </table>
+
+    <div class="info-box">Dashboard 資料透過 Firestore 即時監聽更新，學生一報到，數字立刻變動，不需手動重整頁面。</div>
+  </section>
+
+  <!-- Attendance -->
+  <section id="attendance">
+    <h2>出席管理（手動報到）</h2>
+    <p>從 Dashboard 點班級的「查看出席」進入。顯示當日班級所有學生出席狀態，可手動修改。</p>
+
+    <div class="screen">
+      <div class="screen-bar">
+        <div class="dot" style="background:#ff5f57;"></div>
+        <div class="dot" style="background:#febc2e;"></div>
+        <div class="dot" style="background:#28c840;"></div>
+        <div class="url">https://ithink-sams.web.app/session/20260428_C001</div>
+      </div>
+      <div class="screen-body">
+        <div class="app-nav"><span class="brand">ICE SAMS</span><a href="#" class="active">儀表板</a><span class="logout">登出</span></div>
+        <div class="page-content">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+            <div>
+              <div class="page-title">Scratch 初階班</div>
+              <div class="page-sub">2026-04-28 · 17:00–18:30 · 安和分校 A101</div>
+            </div>
+            <span class="tag tag-green" style="font-size:12px;padding:4px 12px;">進行中</span>
+          </div>
+
+          <table class="mock-table">
+            <thead><tr><th>學生</th><th>狀態</th><th>報到時間</th><th>方式</th><th style="text-align:right;">操作</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><div style="display:flex;align-items:center;gap:8px;"><div class="avatar avatar-green">王</div>王小明</div></td>
+                <td><span class="tag tag-green">已到</span></td>
+                <td style="font-size:12px;color:#888;">17:03:12</td>
+                <td style="font-size:12px;color:#888;">人臉</td>
+                <td style="text-align:right;"><span class="btn btn-outline btn-sm">重設</span></td>
+              </tr>
+              <tr>
+                <td><div style="display:flex;align-items:center;gap:8px;"><div class="avatar avatar-amber">李</div>李大華</div></td>
+                <td><span class="tag tag-amber">遲到</span></td>
+                <td style="font-size:12px;color:#888;">17:18:44</td>
+                <td style="font-size:12px;color:#888;">人臉</td>
+                <td style="text-align:right;"><span class="btn btn-outline btn-sm">重設</span></td>
+              </tr>
+              <tr>
+                <td><div style="display:flex;align-items:center;gap:8px;"><div class="avatar avatar-blue">陳</div>陳美玲</div></td>
+                <td><span class="tag tag-blue">請假</span></td>
+                <td style="font-size:12px;color:#888;">—</td>
+                <td style="font-size:12px;color:#888;">—</td>
+                <td style="text-align:right;"><span class="btn btn-outline btn-sm">重設</span></td>
+              </tr>
+              <tr>
+                <td><div style="display:flex;align-items:center;gap:8px;"><div class="avatar" style="background:#f1efe8;color:#5F5E5A;">張</div>張志豪</div></td>
+                <td><span class="tag tag-gray">未到</span></td>
+                <td style="font-size:12px;color:#888;">—</td>
+                <td style="font-size:12px;color:#888;">—</td>
+                <td style="text-align:right;display:flex;justify-content:flex-end;gap:6px;">
+                  <span class="btn btn-outline btn-sm" style="color:#3B6D11;border-color:#c0dd97;">已到</span>
+                  <span class="btn btn-outline btn-sm" style="color:#185FA5;border-color:#B5D4F4;">請假</span>
+                  <span class="btn btn-outline btn-sm" style="color:#A32D2D;border-color:#f09595;">未到</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <h3>操作說明</h3>
+    <table class="mock-table">
+      <thead><tr><th>按鈕</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag tag-green">已到</span></td><td>標記學生已到，時間記錄為按下按鈕的時間。若在遲到時間之後，系統自動標記為「遲到」。</td></tr>
+        <tr><td><span class="tag tag-blue">請假</span></td><td>標記為請假，不列入缺席統計。</td></tr>
+        <tr><td><span class="tag tag-red">未到</span></td><td>明確標記缺席（通常不用手動設，未報到預設即為未到）。</td></tr>
+        <tr><td>重設</td><td>清除目前狀態，恢復為「未到」，可重新操作。</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warn-box">狀態一旦修改，Dashboard 上的統計數字會即時更新。請謹慎操作，確認後再按。</div>
+
+    <h3>出席狀態說明</h3>
+    <table class="mock-table">
+      <thead><tr><th>狀態</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag tag-green">已到</span></td><td>準時報到（在遲到門檻時間前）</td></tr>
+        <tr><td><span class="tag tag-amber">遲到</span></td><td>課程開始超過 N 分鐘後才報到（預設 15 分鐘）</td></tr>
+        <tr><td><span class="tag tag-blue">請假</span></td><td>事先登錄請假</td></tr>
+        <tr><td><span class="tag tag-gray">未到</span></td><td>課程期間未報到</td></tr>
+        <tr><td><span class="tag" style="background:#f3e8fb;color:#6a3d9a;">缺席</span></td><td>課程結束後仍未報到（系統自動轉為缺席）</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div style="border-top:0.5px solid rgba(0,0,0,0.1);padding-top:24px;margin-top:16px;font-size:12px;color:#aaa;text-align:center;">
+    ICE SAMS 使用者操作手冊 v1.0 · 2026-04-28 · 如有問題請聯絡 joseph@ittraining.com.tw
+  </div>
+
+</div>
+</body>
+</html>
