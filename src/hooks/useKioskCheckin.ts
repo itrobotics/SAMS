@@ -26,15 +26,30 @@ import {
 import { updateAttendance } from '../services/attendance';
 import { decideManualCheckinStatus } from '../utils/attendance';
 import { makeRecordId } from '../types/attendance';
+import { DEFAULT_BRANCH_SETTINGS } from '../types/settings';
 import type { KioskState, KioskMatch } from '../pages/KioskPage';
 import type { FaceProfileDoc } from '../types/faceProfile';
 import type { SessionDoc } from '../types/session';
 import type { AttendanceRecordDoc } from '../types/attendance';
 
-const SIMPLE_DISTANCE_THRESHOLD = 0.5;       // Task 038 會替換為 spec 規則
 const SCAN_INTERVAL_MS = 1000;                // 兩次抓臉間隔
 const COOLDOWN_AFTER_SUCCESS_MS = 8000;       // 同學生 8 秒內不再次報到
 const MODEL_WARMUP_DELAY_MS = 600;
+
+// Spec 7-4 規則（confidence = 1 - distance）
+//   ≥ autoPassThreshold (預設 0.85)  → 自動報到
+//   ≥ confirmThreshold  (預設 0.70)  → 老師確認
+//   < confirmThreshold              → 失敗
+export type ConfidenceVerdict = 'AUTO_PASS' | 'NEED_CONFIRM' | 'FAIL';
+
+export function decideVerdict(
+  confidence: number,
+  thresholds: { auto: number; confirm: number },
+): ConfidenceVerdict {
+  if (confidence >= thresholds.auto) return 'AUTO_PASS';
+  if (confidence >= thresholds.confirm) return 'NEED_CONFIRM';
+  return 'FAIL';
+}
 
 interface UseKioskCheckinArgs {
   enabled: boolean;                           // 攝影機 ready + state in READY
@@ -47,6 +62,9 @@ interface UseKioskCheckinArgs {
   setMatch: (m: KioskMatch | null) => void;
   graceMinutes: number;
   operatorId: string | null;
+  // 信心值門檻（從 settings 來；fallback DEFAULT_BRANCH_SETTINGS）
+  autoPassThreshold?: number;
+  confirmThreshold?: number;
 }
 
 interface KioskCheckinStatus {
@@ -137,30 +155,52 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
       const profiles: FaceProfileDoc[] = await listActiveProfilesForStudents(args.branchId, targetIds);
       const best = findBestMatch(result.embedding, profiles);
 
-      if (!best || best.distance > SIMPLE_DISTANCE_THRESHOLD) {
-        // Task 038 之後會把 FAILED 細分；MVP 先靜靜回 READY
-        args.setKioskState('READY');
+      // 套用 spec 7-4 信心值規則
+      const thresholds = {
+        auto: args.autoPassThreshold ?? DEFAULT_BRANCH_SETTINGS.faceAutoPassThreshold,
+        confirm: args.confirmThreshold ?? DEFAULT_BRANCH_SETTINGS.faceConfirmThreshold,
+      };
+      const verdict: ConfidenceVerdict = best
+        ? decideVerdict(best.confidence, thresholds)
+        : 'FAIL';
+
+      if (!best || verdict === 'FAIL') {
+        // 失敗：閃 FAILED 4 秒（KioskPage 已有 timer 自動回 READY）
+        args.setMatch(null);
+        args.setKioskState('FAILED');
         return;
       }
 
-      // 命中。檢查 cooldown
+      // 找該學生在 selectedSessions 裡的 attendance record
+      const ownRecords = args.attendanceForToday.filter(
+        (r) => r.studentId === best.profile.studentId && args.selectedSessions.has(r.sessionId),
+      );
+      const primaryName = ownRecords[0]?.studentName ?? best.profile.studentId;
+
+      const matchInfo: KioskMatch = {
+        studentId: best.profile.studentId,
+        studentName: primaryName,
+        confidence: best.confidence,
+        recordedAt: new Date(),
+      };
+
+      if (verdict === 'NEED_CONFIRM') {
+        // 中信心 → 切 CONFIRMING，等老師按按鈕（Task 039 wire 按鈕）
+        args.setMatch(matchInfo);
+        args.setKioskState('CONFIRMING');
+        return;
+      }
+
+      // AUTO_PASS — cooldown 檢查、寫入 attendance
       const cool = cooldownRef.current.get(best.profile.studentId);
       if (cool && Date.now() - cool < COOLDOWN_AFTER_SUCCESS_MS) {
         args.setKioskState('READY');
         return;
       }
-
-      // 找該學生在 selectedSessions 裡的 attendance record；可能多個（多堂課同時）
-      // → 全部一起寫成 CHECKED_IN
-      const ownRecords = args.attendanceForToday.filter(
-        (r) => r.studentId === best.profile.studentId && args.selectedSessions.has(r.sessionId),
-      );
       if (ownRecords.length === 0) {
         args.setKioskState('READY');
         return;
       }
-
-      let primaryName = '';
       for (const rec of ownRecords) {
         const session = args.todaySessions.find((s) => s.sessionId === rec.sessionId);
         const status = session
@@ -174,16 +214,10 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
           operatorId: args.operatorId,
           setCheckinNow: true,
         });
-        primaryName = rec.studentName;
       }
 
       cooldownRef.current.set(best.profile.studentId, Date.now());
-      args.setMatch({
-        studentId: best.profile.studentId,
-        studentName: primaryName || best.profile.studentId,
-        confidence: best.confidence,
-        recordedAt: new Date(),
-      });
+      args.setMatch(matchInfo);
       args.setKioskState('SUCCESS');
     } catch (e) {
       // 單次錯誤不要連帶停掉整個迴圈

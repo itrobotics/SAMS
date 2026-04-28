@@ -114,6 +114,8 @@ export function KioskPage() {
     setKioskState: setState,
     setMatch,
     graceMinutes: settings?.graceMinutes ?? DEFAULT_BRANCH_SETTINGS.graceMinutes,
+    autoPassThreshold: settings?.faceAutoPassThreshold ?? DEFAULT_BRANCH_SETTINGS.faceAutoPassThreshold,
+    confirmThreshold: settings?.faceConfirmThreshold ?? DEFAULT_BRANCH_SETTINGS.faceConfirmThreshold,
     operatorId: user?.userId ?? null,
   });
 
