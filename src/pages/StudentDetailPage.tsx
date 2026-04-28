@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 
+import { StudentFacePhotos } from '../components/StudentFacePhotos';
 import { StudentFormDialog } from '../components/StudentFormDialog';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
@@ -132,9 +133,7 @@ export function StudentDetailPage() {
 
         <article style={styles.card}>
           <h2 style={styles.h2}>人臉照片狀態</h2>
-          <p style={styles.placeholder}>
-            face_profiles 將於 Phase 8 / Task 032 後顯示。
-          </p>
+          <StudentFacePhotos student={student} />
         </article>
       </div>
 
