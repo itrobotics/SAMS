@@ -11,6 +11,7 @@ import { StudentDetailPage } from '../pages/StudentDetailPage';
 import { ClassesPage } from '../pages/ClassesPage';
 import { ClassDetailPage } from '../pages/ClassDetailPage';
 import { SettingsPage } from '../pages/SettingsPage';
+import { OptionsPage } from '../pages/OptionsPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 import { AuthGuard } from './AuthGuard';
@@ -100,6 +101,14 @@ export function AppRouter() {
           element={
             <AuthGuard>
               <SettingsPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.options}
+          element={
+            <AuthGuard>
+              <OptionsPage />
             </AuthGuard>
           }
         />

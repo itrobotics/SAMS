@@ -29,7 +29,9 @@ export function AppLayout({ children }: AppLayoutProps) {
     { to: '/branches', label: '分校', show: true },
     { to: ROUTES.students, label: '學生', show: true },
     { to: ROUTES.classes, label: '班級', show: true },
+    { to: ROUTES.instructors, label: '講師', show: true },
     { to: ROUTES.settings, label: '設定', show: isHQ },
+    { to: ROUTES.options, label: '選項管理', show: isHQ },
   ];
 
   async function handleLogout() {
