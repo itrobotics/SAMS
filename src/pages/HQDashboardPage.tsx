@@ -14,7 +14,7 @@
 // Task 044: 異常提醒區（未到比例過高 / 人臉失敗過多 / 未完成點名）
 
 import { useEffect, useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../hooks/useAuth';
 import { subscribeBranches } from '../services/branches';
@@ -52,6 +52,7 @@ const EMPTY_ROW = (b: BranchDoc): BranchRow => ({
 
 export function HQDashboardPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [date, setDate] = useState(todayISO());
   const [branches, setBranches] = useState<BranchDoc[]>([]);
   const [sessions, setSessions] = useState<SessionDoc[]>([]);
@@ -145,9 +146,20 @@ export function HQDashboardPage() {
               </tr>
             )}
             {rows.map((r) => (
-              <tr key={r.branch.branchId}>
+              <tr
+                key={r.branch.branchId}
+                style={styles.rowClickable}
+                onClick={() => navigate(ROUTES.branchDashboard(r.branch.branchId))}
+                title={`進入 ${r.branch.name} 看板`}
+              >
                 <td style={styles.td}>
-                  <strong>{r.branch.name}</strong>
+                  <Link
+                    to={ROUTES.branchDashboard(r.branch.branchId)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ fontWeight: 600, color: '#1f2937' }}
+                  >
+                    {r.branch.name}
+                  </Link>
                   <div style={{ color: '#9ca3af', fontSize: '0.8rem' }}>
                     <code>{r.branch.branchId}</code>
                   </div>
@@ -164,10 +176,13 @@ export function HQDashboardPage() {
                   {r.total === 0 ? '—' : `${(r.attendanceRate * 100).toFixed(0)}%`}
                 </td>
                 <td style={styles.td}>
-                  {/* Task 043 在此加 drill-down */}
-                  <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>
-                    Task 043 加入
-                  </span>
+                  <Link
+                    to={ROUTES.branchDashboard(r.branch.branchId)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ color: '#2563eb', fontSize: '0.9rem' }}
+                  >
+                    進入看板 →
+                  </Link>
                 </td>
               </tr>
             ))}
@@ -319,6 +334,7 @@ const styles: Record<string, React.CSSProperties> = {
   td: { padding: '0.7rem 1rem', borderBottom: '1px solid #f3f4f6' },
   tdNum: { padding: '0.7rem 1rem', borderBottom: '1px solid #f3f4f6', textAlign: 'right', fontVariantNumeric: 'tabular-nums' },
   empty: { padding: '2rem', textAlign: 'center', color: '#9ca3af' },
+  rowClickable: { cursor: 'pointer' },
 };
 
 // 給 Task 044 用：BranchRow 與 Totals 型別 export
