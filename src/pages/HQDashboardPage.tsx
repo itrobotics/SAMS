@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 
+import { HQAnomalyPanel } from '../components/HQAnomalyPanel';
 import { useAuth } from '../hooks/useAuth';
 import { subscribeBranches } from '../services/branches';
 import { subscribeAllAttendanceForDate } from '../services/attendance';
@@ -122,7 +123,7 @@ export function HQDashboardPage() {
         />
       </div>
 
-      {/* Task 044 異常提醒區 — 下個 commit 接 */}
+      <HQAnomalyPanel date={date} sessions={sessions} records={records} />
 
       <div style={styles.tableWrap}>
         <table style={styles.table}>
