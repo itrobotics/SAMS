@@ -18,7 +18,7 @@ import {
 } from '../services/classStudents';
 import { subscribeStudents } from '../services/students';
 import { canAccessBranch } from '../types/user';
-import { CLASSES_COLLECTION, WEEKDAY_LABELS, type ClassDoc } from '../types/class';
+import { CLASSES_COLLECTION, WEEKDAY_LABELS, type ClassDoc, type ClassMeeting } from '../types/class';
 import type { ClassStudentDoc } from '../types/classStudent';
 import type { StudentDoc } from '../types/student';
 
@@ -144,14 +144,22 @@ export function ClassDetailPage() {
           <Link to="/classes" style={styles.back}>← 回班級列表</Link>
           <h1 style={styles.title}>{klass.name}</h1>
           <p style={styles.subtitle}>
-            <code>{klass.classId}</code> · {branchName} · {WEEKDAY_LABELS[klass.weekday]} {klass.startTime}–{klass.endTime}
-            {klass.classroom ? ` · 教室 ${klass.classroom}` : ''}
-            {klass.teacherId ? ` · 老師 ${klass.teacherId}` : ''}
+            <code>{klass.classId}</code> · {branchName}
+            {klass.classroom ? ` · 預設教室 ${klass.classroom}` : ''}
+            {klass.teacherId ? ` · 預設老師 ${klass.teacherId}` : ''}
             {' · '}
             <span style={klass.active ? styles.pillActive : styles.pillInactive}>
               {klass.active ? '啟用' : '停用'}
             </span>
           </p>
+          <ul style={meetingsListStyle}>
+            {(klass.meetings ?? []).map((m, idx) => (
+              <li key={idx} style={meetingsItemStyle}>
+                <strong>{WEEKDAY_LABELS[m.weekday] ?? `週${m.weekday}`} {m.startTime}–{m.endTime}</strong>
+                {meetingOverrideSuffix(m, klass)}
+              </li>
+            ))}
+          </ul>
         </div>
       </header>
 
@@ -226,6 +234,27 @@ export function ClassDetailPage() {
     </section>
   );
 }
+
+function meetingOverrideSuffix(m: ClassMeeting, klass: ClassDoc): string {
+  const parts: string[] = [];
+  if (m.classroom && m.classroom !== klass.classroom) parts.push(`教室 ${m.classroom}`);
+  if (m.teacherId && m.teacherId !== klass.teacherId) parts.push(`老師 ${m.teacherId}`);
+  return parts.length === 0 ? '' : `（${parts.join('、')}）`;
+}
+
+const meetingsListStyle: React.CSSProperties = {
+  listStyle: 'none',
+  padding: 0,
+  margin: '0.6rem 0 0',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.25rem',
+};
+
+const meetingsItemStyle: React.CSSProperties = {
+  fontSize: '0.95rem',
+  color: '#374151',
+};
 
 const styles: Record<string, React.CSSProperties> = {
   header: { marginBottom: '1.5rem' },

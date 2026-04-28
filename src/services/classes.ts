@@ -1,4 +1,18 @@
-// classes CRUD（Task 015）
+// classes CRUD
+//
+// 寫入：createClass / updateClass — 內部會自動 sortMeetings + deriveWeekdays，
+// 不需 caller 提前處理。
+//
+// 查詢：
+//   subscribeClasses({ branchIds, weekday?, activeOnly? })
+//     - branchIds 仍走 server-side `where('branchId', 'in', ...)`（分校隔離邊界）
+//     - weekday 過濾改 client-side（Firestore 不允許 in + array-contains 共存）
+//     - 拿掉 orderBy('startTime')（ClassDoc 不再有單一 startTime）
+//     - 排序由 client 端依 name 處理
+//
+//   listClassesForGeneration(weekday)
+//     - 用 `where('weekdays', 'array-contains', weekday) + where('active', '==', true)`
+//     - 需新 composite index（見 firestore.indexes.json）
 
 import {
   collection,
@@ -6,7 +20,6 @@ import {
   getDoc,
   getDocs,
   onSnapshot,
-  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -18,9 +31,10 @@ import {
 import { db } from './firebase';
 import {
   CLASSES_COLLECTION,
-  compareTime,
+  deriveWeekdays,
   isValidClassId,
-  isValidTime,
+  sortMeetings,
+  validateMeetings,
   type ClassDoc,
   type NewClassInput,
   type UpdateClassInput,
@@ -42,7 +56,7 @@ export async function fetchClass(classId: string): Promise<ClassDoc | null> {
 
 interface SubscribeClassesOptions {
   branchIds?: string[]; // undefined = HQ 看全部
-  weekday?: number;
+  weekday?: number;     // client-side 過濾，不參與 Firestore query
   activeOnly?: boolean;
 }
 
@@ -55,37 +69,38 @@ export function subscribeClasses(
   if (options.branchIds && options.branchIds.length > 0) {
     constraints.push(where('branchId', 'in', options.branchIds.slice(0, 30)));
   }
-  if (options.weekday !== undefined) {
-    constraints.push(where('weekday', '==', options.weekday));
-  }
   if (options.activeOnly) {
     constraints.push(where('active', '==', true));
   }
-  const q = query(collection(db, CLASSES_COLLECTION), ...constraints, orderBy('startTime', 'asc'));
+  // 注意：不加 orderBy('startTime') 也不加 where('weekday', ...)。
+  // weekday filter 在 client 端用 weekdays.includes() 處理。
+  const q = query(collection(db, CLASSES_COLLECTION), ...constraints);
   return onSnapshot(
     q,
-    (snap) => onChange(snap.docs.map(snapshotToClass)),
+    (snap) => {
+      let list = snap.docs.map(snapshotToClass);
+      if (options.weekday !== undefined) {
+        const wd = options.weekday;
+        list = list.filter((c) => Array.isArray(c.weekdays) && c.weekdays.includes(wd));
+      }
+      // 客端統一按 name 排序，UI 穩定
+      list.sort((a, b) => a.name.localeCompare(b.name));
+      onChange(list);
+    },
     (err) => onError?.(err),
   );
 }
 
-// 一次性查詢（給每日場次產生器用，不需要訂閱）
+// 一次性查詢（給每日場次產生器用，不需要訂閱）。
+// where('weekdays', 'array-contains', N) 需要 composite index 與 active。
 export async function listClassesForGeneration(weekday: number): Promise<ClassDoc[]> {
   const q = query(
     collection(db, CLASSES_COLLECTION),
-    where('weekday', '==', weekday),
+    where('weekdays', 'array-contains', weekday),
     where('active', '==', true),
   );
   const snap = await getDocs(q);
   return snap.docs.map(snapshotToClass);
-}
-
-function validateTimes(startTime: string, endTime: string): void {
-  if (!isValidTime(startTime)) throw new Error('上課時間格式錯誤（需為 HH:mm）');
-  if (!isValidTime(endTime)) throw new Error('下課時間格式錯誤（需為 HH:mm）');
-  if (compareTime(startTime, endTime) >= 0) {
-    throw new Error('下課時間必須晚於上課時間');
-  }
 }
 
 export async function createClass(input: NewClassInput): Promise<void> {
@@ -95,8 +110,11 @@ export async function createClass(input: NewClassInput): Promise<void> {
   }
   if (!input.branchId.trim()) throw new Error('請選擇分校');
   if (!input.name.trim()) throw new Error('請填寫班級名稱');
-  if (input.weekday < 1 || input.weekday > 7) throw new Error('星期幾必須為 1-7');
-  validateTimes(input.startTime, input.endTime);
+
+  // 驗證 + 正規化 meetings
+  validateMeetings(input.meetings);
+  const meetings = sortMeetings(input.meetings);
+  const weekdays = deriveWeekdays(meetings);
 
   const existing = await getDoc(classRef(classId));
   if (existing.exists()) throw new Error(`班級代碼「${classId}」已存在`);
@@ -106,9 +124,8 @@ export async function createClass(input: NewClassInput): Promise<void> {
     name: input.name.trim(),
     teacherId: input.teacherId?.trim() ?? '',
     classroom: input.classroom?.trim() ?? '',
-    weekday: input.weekday,
-    startTime: input.startTime,
-    endTime: input.endTime,
+    meetings,
+    weekdays,
     active: true,
     createdAt: serverTimestamp(),
   });
@@ -120,14 +137,10 @@ export async function updateClass(classId: string, patch: UpdateClassInput): Pro
   if (patch.name !== undefined) cleaned.name = patch.name.trim();
   if (patch.teacherId !== undefined) cleaned.teacherId = patch.teacherId.trim();
   if (patch.classroom !== undefined) cleaned.classroom = patch.classroom.trim();
-  if (patch.weekday !== undefined) {
-    if (patch.weekday < 1 || patch.weekday > 7) throw new Error('星期幾必須為 1-7');
-    cleaned.weekday = patch.weekday;
-  }
-  if (patch.startTime !== undefined) cleaned.startTime = patch.startTime;
-  if (patch.endTime !== undefined) cleaned.endTime = patch.endTime;
-  if (patch.startTime !== undefined && patch.endTime !== undefined) {
-    validateTimes(patch.startTime, patch.endTime);
+  if (patch.meetings !== undefined) {
+    validateMeetings(patch.meetings);
+    cleaned.meetings = sortMeetings(patch.meetings);
+    cleaned.weekdays = deriveWeekdays(patch.meetings);
   }
   if (patch.active !== undefined) cleaned.active = patch.active;
   if (Object.keys(cleaned).length === 0) return;

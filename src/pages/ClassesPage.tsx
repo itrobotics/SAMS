@@ -9,7 +9,7 @@ import { ClassFormDialog } from '../components/ClassFormDialog';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { setClassActive, subscribeClasses } from '../services/classes';
-import { WEEKDAY_LABELS, type ClassDoc } from '../types/class';
+import { WEEKDAY_LABELS, formatMeetingsLabel, type ClassDoc } from '../types/class';
 
 const ALL = '__all__';
 
@@ -70,10 +70,17 @@ export function ClassesPage() {
     const teacherKw = filterTeacher.trim().toLowerCase();
     return classes.filter((c) => {
       if (filterBranch !== ALL && c.branchId !== filterBranch) return false;
-      if (filterWeekday !== ALL && c.weekday !== filterWeekday) return false;
+      if (filterWeekday !== ALL && !(c.weekdays ?? []).includes(filterWeekday)) return false;
       if (filterActive === 'active' && !c.active) return false;
       if (filterActive === 'disabled' && c.active) return false;
-      if (teacherKw && !c.teacherId.toLowerCase().includes(teacherKw)) return false;
+      if (teacherKw) {
+        // 比對預設老師 + 任一 meeting 的老師覆蓋
+        const haystack = [
+          c.teacherId,
+          ...(c.meetings ?? []).map((m) => m.teacherId ?? ''),
+        ].join(' ').toLowerCase();
+        if (!haystack.includes(teacherKw)) return false;
+      }
       return true;
     });
   }, [classes, filterBranch, filterWeekday, filterActive, filterTeacher]);
@@ -136,20 +143,19 @@ export function ClassesPage() {
               <th style={styles.th}>班級代碼</th>
               <th style={styles.th}>名稱</th>
               <th style={styles.th}>分校</th>
-              <th style={styles.th}>老師</th>
-              <th style={styles.th}>教室</th>
-              <th style={styles.th}>上課日</th>
-              <th style={styles.th}>時段</th>
+              <th style={styles.th}>預設老師</th>
+              <th style={styles.th}>預設教室</th>
+              <th style={styles.th}>上課時段</th>
               <th style={styles.th}>狀態</th>
               <th style={styles.th}>操作</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={9} style={styles.empty}>載入中…</td></tr>
+              <tr><td colSpan={8} style={styles.empty}>載入中…</td></tr>
             )}
             {!loading && visible.length === 0 && (
-              <tr><td colSpan={9} style={styles.empty}>沒有符合條件的班級</td></tr>
+              <tr><td colSpan={8} style={styles.empty}>沒有符合條件的班級</td></tr>
             )}
             {visible.map((c) => (
               <tr key={c.classId}>
@@ -160,8 +166,7 @@ export function ClassesPage() {
                 <td style={styles.td}>{branchName(c.branchId)}</td>
                 <td style={styles.td}>{c.teacherId || '—'}</td>
                 <td style={styles.td}>{c.classroom || '—'}</td>
-                <td style={styles.td}>{WEEKDAY_LABELS[c.weekday] ?? '—'}</td>
-                <td style={styles.td}>{c.startTime} – {c.endTime}</td>
+                <td style={styles.td}>{formatMeetingsLabel(c.meetings ?? [])}</td>
                 <td style={styles.td}>
                   <span style={c.active ? styles.pillActive : styles.pillInactive}>
                     {c.active ? '啟用' : '停用'}
