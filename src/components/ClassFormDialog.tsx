@@ -1,4 +1,4 @@
-// 班級新增 / 編輯表單（多時段版）
+// 班級新增 / 編輯表單（多時段版，updated Task 053）
 //
 // 一個班級可有多組 meetings，每組指定 weekday + 時段，並可選擇性 override
 // 教室 / 老師。同一 weekday 可有多筆（如週一 AM / 週一 PM 不同老師），
@@ -9,7 +9,9 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Modal } from './Modal';
 import { formStyles } from './formStyles';
 import { useBranches } from '../hooks/useBranches';
+import { subscribeOptions } from '../services/appOptions';
 import { createClass, updateClass } from '../services/classes';
+import { subscribeInstructors } from '../services/instructors';
 import {
   CLASSES_COLLECTION,
   WEEKDAY_LABELS,
@@ -17,6 +19,8 @@ import {
   type ClassDoc,
   type ClassMeeting,
 } from '../types/class';
+import { OPTION_KEYS } from '../types/appOptions';
+import type { InstructorDoc } from '../types/instructor';
 import { getNextId } from '../utils/autoId';
 
 interface ClassFormDialogProps {
@@ -32,15 +36,25 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
   const isEdit = !!initial;
   const { branches } = useBranches(true);
 
+  const [instructors, setInstructors] = useState<InstructorDoc[]>([]);
+  const [courseTypeOptions, setCourseTypeOptions] = useState<string[]>([]);
+
   const [classId, setClassId] = useState('');
   const [branchId, setBranchId] = useState('');
   const [name, setName] = useState('');
   const [teacherId, setTeacherId] = useState('');
   const [classroom, setClassroom] = useState('');
+  const [courseType, setCourseType] = useState('');
   const [meetings, setMeetings] = useState<ClassMeeting[]>([DEFAULT_MEETING]);
   const [active, setActive] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const u1 = subscribeInstructors({ activeOnly: true }, setInstructors);
+    const u2 = subscribeOptions(OPTION_KEYS.courseTypes, setCourseTypeOptions);
+    return () => { u1(); u2(); };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -53,6 +67,7 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
     setName(initial?.name ?? '');
     setTeacherId(initial?.teacherId ?? '');
     setClassroom(initial?.classroom ?? '');
+    setCourseType(initial?.courseType ?? '');
     setMeetings(
       initial?.meetings && initial.meetings.length > 0
         ? initial.meetings.map((m) => ({ ...m }))
@@ -72,7 +87,6 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
   }
 
   function addMeeting() {
-    // 複製最後一筆當 template；user 通常只改 weekday 或時段
     setMeetings((prev) => {
       const last = prev[prev.length - 1] ?? DEFAULT_MEETING;
       return [...prev, { ...last, classroom: undefined, teacherId: undefined }];
@@ -95,15 +109,13 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
     setSubmitting(true);
     setError(null);
     try {
-      // meetings 的詳細驗證（重疊、格式）由 service 端 validateMeetings 處理，
-      // 這邊只做粗略 UI guard
       if (isEdit && initial) {
         await updateClass(initial.classId, {
-          branchId, name, teacherId, classroom, meetings, active,
+          branchId, name, teacherId, classroom, courseType, meetings, active,
         });
       } else {
         await createClass({
-          classId, branchId, name, teacherId, classroom, meetings,
+          classId, branchId, name, teacherId, classroom, courseType, meetings,
         });
       }
       onSaved();
@@ -116,7 +128,7 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
   }
 
   return (
-    <Modal open={open} title={isEdit ? '編輯班級' : '新增班級'} onClose={onClose} width={680}>
+    <Modal open={open} title={isEdit ? '編輯班級' : '新增班級'} onClose={onClose} width={700}>
       <form onSubmit={handleSubmit}>
         {error && <div style={formStyles.error}>{error}</div>}
 
@@ -145,32 +157,41 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
           </div>
         </div>
 
-        <div style={formStyles.field}>
-          <label style={formStyles.label}>分校<span style={formStyles.required}>*</span></label>
-          <select
-            style={formStyles.select}
-            value={branchId}
-            onChange={(e) => setBranchId(e.target.value)}
-            disabled={submitting}
-            required
-          >
-            <option value="">請選擇</option>
-            {branches.map((b) => (
-              <option key={b.branchId} value={b.branchId}>{b.name}（{b.branchId}）</option>
-            ))}
-          </select>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ ...formStyles.field, flex: 1 }}>
+            <label style={formStyles.label}>分校<span style={formStyles.required}>*</span></label>
+            <select style={formStyles.select} value={branchId}
+              onChange={(e) => setBranchId(e.target.value)} disabled={submitting} required>
+              <option value="">請選擇</option>
+              {branches.map((b) => (
+                <option key={b.branchId} value={b.branchId}>{b.name}（{b.branchId}）</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ ...formStyles.field, flex: 1 }}>
+            <label style={formStyles.label}>課程類型</label>
+            <select style={formStyles.select} value={courseType}
+              onChange={(e) => setCourseType(e.target.value)} disabled={submitting}>
+              <option value="">請選擇</option>
+              {courseTypeOptions.map((ct) => (
+                <option key={ct} value={ct}>{ct}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <div style={{ ...formStyles.field, flex: 1 }}>
-            <label style={formStyles.label}>預設老師代碼</label>
-            <input
-              style={formStyles.input}
-              value={teacherId}
-              onChange={(e) => setTeacherId(e.target.value)}
-              placeholder="例：T001"
-              disabled={submitting}
-            />
+            <label style={formStyles.label}>預設老師</label>
+            <select style={formStyles.select} value={teacherId}
+              onChange={(e) => setTeacherId(e.target.value)} disabled={submitting}>
+              <option value="">（未指定）</option>
+              {instructors.map((t) => (
+                <option key={t.instructorId} value={t.instructorId}>
+                  {t.instructorId}-{t.name}
+                </option>
+              ))}
+            </select>
             <span style={formStyles.hint}>個別時段可在下方覆蓋</span>
           </div>
           <div style={{ ...formStyles.field, flex: 1 }}>
@@ -197,18 +218,14 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
             <MeetingRow
               key={idx}
               meeting={m}
+              instructors={instructors}
               canDelete={meetings.length > 1}
               disabled={submitting}
               onChange={(patch) => updateMeeting(idx, patch)}
               onRemove={() => removeMeeting(idx)}
             />
           ))}
-          <button
-            type="button"
-            onClick={addMeeting}
-            disabled={submitting}
-            style={addMeetingBtnStyle}
-          >
+          <button type="button" onClick={addMeeting} disabled={submitting} style={addMeetingBtnStyle}>
             ＋ 新增上課時段
           </button>
         </fieldset>
@@ -216,12 +233,8 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
         {isEdit && (
           <div style={formStyles.field}>
             <label style={{ ...formStyles.label, display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <input
-                type="checkbox"
-                checked={active}
-                onChange={(e) => setActive(e.target.checked)}
-                disabled={submitting}
-              />
+              <input type="checkbox" checked={active}
+                onChange={(e) => setActive(e.target.checked)} disabled={submitting} />
               啟用此班級（取消勾選等同停用，當日場次不會產生）
             </label>
           </div>
@@ -242,13 +255,14 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
 
 interface MeetingRowProps {
   meeting: ClassMeeting;
+  instructors: InstructorDoc[];
   canDelete: boolean;
   disabled: boolean;
   onChange: (patch: Partial<ClassMeeting>) => void;
   onRemove: () => void;
 }
 
-function MeetingRow({ meeting, canDelete, disabled, onChange, onRemove }: MeetingRowProps) {
+function MeetingRow({ meeting, instructors, canDelete, disabled, onChange, onRemove }: MeetingRowProps) {
   return (
     <div style={meetingRowStyle}>
       <div style={meetingRowMainStyle}>
@@ -283,14 +297,8 @@ function MeetingRow({ meeting, canDelete, disabled, onChange, onRemove }: Meetin
           required
         />
         {canDelete && (
-          <button
-            type="button"
-            onClick={onRemove}
-            disabled={disabled}
-            style={meetingRemoveBtnStyle}
-            aria-label="刪除此時段"
-            title="刪除此時段"
-          >
+          <button type="button" onClick={onRemove} disabled={disabled}
+            style={meetingRemoveBtnStyle} aria-label="刪除此時段" title="刪除此時段">
             ✕
           </button>
         )}
@@ -304,63 +312,47 @@ function MeetingRow({ meeting, canDelete, disabled, onChange, onRemove }: Meetin
           placeholder="教室（沿用預設）"
           disabled={disabled}
         />
-        <input
+        <select
           aria-label="老師（可空）"
-          style={{ ...formStyles.input, flex: 1 }}
+          style={{ ...formStyles.select, flex: 1 }}
           value={meeting.teacherId ?? ''}
           onChange={(e) => onChange({ teacherId: e.target.value || undefined })}
-          placeholder="老師代碼（沿用預設）"
           disabled={disabled}
-        />
+        >
+          <option value="">老師（沿用預設）</option>
+          {instructors.map((t) => (
+            <option key={t.instructorId} value={t.instructorId}>
+              {t.instructorId}-{t.name}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );
 }
 
 const meetingsBoxStyle: React.CSSProperties = {
-  border: '1px solid #e5e7eb',
-  borderRadius: 8,
-  padding: '0.75rem 1rem 1rem',
-  margin: '0 0 0.9rem',
+  border: '1px solid #e5e7eb', borderRadius: 8,
+  padding: '0.75rem 1rem 1rem', margin: '0 0 0.9rem',
 };
 const legendStyle: React.CSSProperties = {
-  padding: '0 0.4rem',
-  fontSize: '0.85rem',
-  color: '#374151',
-  fontWeight: 500,
+  padding: '0 0.4rem', fontSize: '0.85rem', color: '#374151', fontWeight: 500,
 };
 const meetingRowStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.4rem',
-  padding: '0.5rem 0',
-  borderBottom: '1px dashed #f3f4f6',
+  display: 'flex', flexDirection: 'column', gap: '0.4rem',
+  padding: '0.5rem 0', borderBottom: '1px dashed #f3f4f6',
 };
 const meetingRowMainStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: '0.4rem',
-  alignItems: 'center',
+  display: 'flex', gap: '0.4rem', alignItems: 'center',
 };
-const meetingRowOverrideStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: '0.4rem',
-};
+const meetingRowOverrideStyle: React.CSSProperties = { display: 'flex', gap: '0.4rem' };
 const meetingRemoveBtnStyle: React.CSSProperties = {
-  marginLeft: 'auto',
-  padding: '0.35rem 0.6rem',
-  background: '#fff',
-  color: '#b91c1c',
-  border: '1px solid #fecaca',
-  borderRadius: 6,
-  fontSize: '0.85rem',
-  lineHeight: 1,
+  marginLeft: 'auto', padding: '0.35rem 0.6rem',
+  background: '#fff', color: '#b91c1c', border: '1px solid #fecaca',
+  borderRadius: 6, fontSize: '0.85rem', lineHeight: 1,
 };
 const addMeetingBtnStyle: React.CSSProperties = {
-  marginTop: '0.5rem',
-  padding: '0.45rem 0.85rem',
-  background: '#fff',
-  color: '#2563eb',
-  border: '1px dashed #93c5fd',
-  borderRadius: 6,
-  fontSize: '0.9rem',
+  marginTop: '0.5rem', padding: '0.45rem 0.85rem',
+  background: '#fff', color: '#2563eb', border: '1px dashed #93c5fd',
+  borderRadius: 6, fontSize: '0.9rem',
 };
