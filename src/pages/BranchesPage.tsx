@@ -89,6 +89,8 @@ export function BranchesPage() {
               <th style={styles.th}>分校代碼</th>
               <th style={styles.th}>名稱</th>
               <th style={styles.th}>地址</th>
+              <th style={styles.th}>客服電話</th>
+              <th style={styles.th}>主任姓名</th>
               <th style={styles.th}>狀態</th>
               <th style={styles.th}>今日看板</th>
               {isHQ && <th style={styles.th}>操作</th>}
@@ -97,12 +99,12 @@ export function BranchesPage() {
           <tbody>
             {loading && (
               <tr>
-                <td style={styles.empty} colSpan={isHQ ? 6 : 5}>載入中…</td>
+                <td style={styles.empty} colSpan={isHQ ? 8 : 7}>載入中…</td>
               </tr>
             )}
             {!loading && visible.length === 0 && (
               <tr>
-                <td style={styles.empty} colSpan={isHQ ? 6 : 5}>目前沒有可顯示的分校</td>
+                <td style={styles.empty} colSpan={isHQ ? 8 : 7}>目前沒有可顯示的分校</td>
               </tr>
             )}
             {visible.map((b) => (
@@ -110,6 +112,8 @@ export function BranchesPage() {
                 <td style={styles.td}><code>{b.branchId}</code></td>
                 <td style={styles.td}>{b.name}</td>
                 <td style={styles.td}>{b.address || '—'}</td>
+                <td style={styles.td}>{b.servicePhone || '—'}</td>
+                <td style={styles.td}>{b.directorName || '—'}</td>
                 <td style={styles.td}><StatusPill status={b.status} /></td>
                 <td style={styles.td}>
                   <Link to={ROUTES.branchDashboard(b.branchId)}>進入 →</Link>
