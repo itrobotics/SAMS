@@ -21,7 +21,7 @@ import {
 import { db } from './firebase';
 import {
   CLASS_PRICING_COLLECTION,
-  validatePricingDates,
+  isValidPriceType,
   type ClassPricingDoc,
   type NewClassPricingInput,
   type UpdateClassPricingInput,
@@ -82,12 +82,7 @@ export function subscribeClassPricing(
     q,
     (snap) => {
       const list = snap.docs.map(snapshotToPricing);
-      // 預設排序：班級名稱 → effectiveFrom 由新到舊
-      list.sort((a, b) => {
-        const byName = a.className.localeCompare(b.className);
-        if (byName !== 0) return byName;
-        return b.effectiveFrom.localeCompare(a.effectiveFrom);
-      });
+      list.sort((a, b) => a.className.localeCompare(b.className));
       onChange(list);
     },
     (err) => onError?.(err),
@@ -101,14 +96,11 @@ export async function createClassPricing(input: NewClassPricingInput): Promise<s
   if (!Number.isFinite(input.price) || input.price < 0) {
     throw new Error('定價必須為大於等於 0 的數字');
   }
-  if (input.priceType !== 'per_month' && input.priceType !== 'per_session') {
+  if (!isValidPriceType(input.priceType)) {
     throw new Error('計費方式錯誤');
   }
-  validatePricingDates(input.effectiveFrom, input.effectiveTo ?? null);
 
   const pricingId = await nextPricingId();
-  const effectiveTo =
-    input.effectiveTo === undefined || input.effectiveTo === '' ? null : input.effectiveTo;
 
   await setDoc(pricingRef(pricingId), {
     classId: input.classId.trim(),
@@ -116,8 +108,6 @@ export async function createClassPricing(input: NewClassPricingInput): Promise<s
     className: input.className.trim(),
     price: input.price,
     priceType: input.priceType,
-    effectiveFrom: input.effectiveFrom,
-    effectiveTo,
     notes: input.notes?.trim() ?? '',
     active: input.active ?? true,
     createdAt: serverTimestamp(),
@@ -141,22 +131,8 @@ export async function updateClassPricing(
     cleaned.price = patch.price;
   }
   if (patch.priceType !== undefined) {
-    if (patch.priceType !== 'per_month' && patch.priceType !== 'per_session') {
-      throw new Error('計費方式錯誤');
-    }
+    if (!isValidPriceType(patch.priceType)) throw new Error('計費方式錯誤');
     cleaned.priceType = patch.priceType;
-  }
-  if (patch.effectiveFrom !== undefined || patch.effectiveTo !== undefined) {
-    const from = patch.effectiveFrom ?? '';
-    const to = patch.effectiveTo;
-    // 對於部分更新，仍然要兩個欄位都存在才能正確驗證；caller 該補齊未變動的欄位。
-    if (from) {
-      validatePricingDates(from, to ?? null);
-      cleaned.effectiveFrom = from;
-    }
-    if (to !== undefined) {
-      cleaned.effectiveTo = to === '' ? null : to;
-    }
   }
   if (patch.notes !== undefined) cleaned.notes = patch.notes.trim();
   if (patch.active !== undefined) cleaned.active = patch.active;

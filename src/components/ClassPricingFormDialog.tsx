@@ -10,6 +10,7 @@ import { subscribeClasses } from '../services/classes';
 import { createClassPricing, updateClassPricing } from '../services/classPricing';
 import type { ClassDoc } from '../types/class';
 import {
+  PRICE_TYPES,
   PRICE_TYPE_LABELS,
   type ClassPricingDoc,
   type PriceType,
@@ -22,13 +23,6 @@ interface Props {
   onSaved: () => void;
 }
 
-function defaultMonth(offset = 0): string {
-  const d = new Date();
-  d.setDate(1);
-  d.setMonth(d.getMonth() + offset);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
 export function ClassPricingFormDialog({ open, initial, onClose, onSaved }: Props) {
   const isEdit = !!initial;
   const { user } = useAuth();
@@ -37,9 +31,7 @@ export function ClassPricingFormDialog({ open, initial, onClose, onSaved }: Prop
   const [classes, setClasses] = useState<ClassDoc[]>([]);
   const [classId, setClassId] = useState('');
   const [price, setPrice] = useState('');
-  const [priceType, setPriceType] = useState<PriceType>('per_month');
-  const [effectiveFrom, setEffectiveFrom] = useState(defaultMonth());
-  const [effectiveTo, setEffectiveTo] = useState('');
+  const [priceType, setPriceType] = useState<PriceType>('per_class');
   const [notes, setNotes] = useState('');
   const [active, setActive] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -60,9 +52,7 @@ export function ClassPricingFormDialog({ open, initial, onClose, onSaved }: Prop
     if (!open) return;
     setClassId(initial?.classId ?? '');
     setPrice(initial ? String(initial.price) : '');
-    setPriceType(initial?.priceType ?? 'per_month');
-    setEffectiveFrom(initial?.effectiveFrom ?? defaultMonth());
-    setEffectiveTo(initial?.effectiveTo ?? '');
+    setPriceType(initial?.priceType ?? 'per_class');
     setNotes(initial?.notes ?? '');
     setActive(initial?.active ?? true);
     setError(null);
@@ -90,8 +80,6 @@ export function ClassPricingFormDialog({ open, initial, onClose, onSaved }: Prop
           className: klass.name,
           price: priceNum,
           priceType,
-          effectiveFrom,
-          effectiveTo: effectiveTo === '' ? null : effectiveTo,
           notes,
           active,
         });
@@ -102,8 +90,6 @@ export function ClassPricingFormDialog({ open, initial, onClose, onSaved }: Prop
           className: klass.name,
           price: priceNum,
           priceType,
-          effectiveFrom,
-          effectiveTo: effectiveTo === '' ? null : effectiveTo,
           notes,
           active,
           createdBy: user.userId,
@@ -176,37 +162,10 @@ export function ClassPricingFormDialog({ open, initial, onClose, onSaved }: Prop
               disabled={submitting}
               required
             >
-              <option value="per_month">{PRICE_TYPE_LABELS.per_month}</option>
-              <option value="per_session">{PRICE_TYPE_LABELS.per_session}</option>
+              {PRICE_TYPES.map((pt) => (
+                <option key={pt} value={pt}>{PRICE_TYPE_LABELS[pt]}</option>
+              ))}
             </select>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <div style={{ ...formStyles.field, flex: 1 }}>
-            <label style={formStyles.label}>
-              生效起始月份<span style={formStyles.required}>*</span>
-            </label>
-            <input
-              type="month"
-              style={formStyles.input}
-              value={effectiveFrom}
-              onChange={(e) => setEffectiveFrom(e.target.value)}
-              disabled={submitting}
-              required
-            />
-          </div>
-          <div style={{ ...formStyles.field, flex: 1 }}>
-            <label style={formStyles.label}>生效結束月份</label>
-            <input
-              type="month"
-              style={formStyles.input}
-              value={effectiveTo}
-              onChange={(e) => setEffectiveTo(e.target.value)}
-              disabled={submitting}
-              min={effectiveFrom || undefined}
-            />
-            <span style={formStyles.hint}>留白代表目前仍有效</span>
           </div>
         </div>
 

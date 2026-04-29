@@ -2,7 +2,7 @@
 //
 // 功能：
 //   - 列出所有定價（依登入者角色過濾分校）
-//   - 篩選：分校、班級名稱、生效期間（YYYY-MM 範圍）、啟用狀態
+//   - 篩選：分校、班級名稱、啟用狀態
 //   - CRUD：新增、編輯、停用 / 啟用
 //   - 列表顯示「目前人數 × 定價 = 預估營收」
 //
@@ -21,19 +21,10 @@ import {
 } from '../services/classPricing';
 import {
   PRICE_TYPE_LABELS,
-  formatEffectiveRange,
-  pricingOverlapsRange,
   type ClassPricingDoc,
 } from '../types/classPricing';
 
 const ALL = '__all__';
-
-function defaultMonth(offset = 0): string {
-  const d = new Date();
-  d.setDate(1);
-  d.setMonth(d.getMonth() + offset);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
 
 const TWD = new Intl.NumberFormat('zh-TW');
 
@@ -53,8 +44,6 @@ export function ClassPricingPage() {
   const [filterBranch, setFilterBranch] = useState<string>(ALL);
   const [filterName, setFilterName] = useState('');
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'disabled'>('active');
-  const [filterFrom, setFilterFrom] = useState<string>(''); // YYYY-MM
-  const [filterTo, setFilterTo] = useState<string>('');     // YYYY-MM
 
   function openCreate() { setEditing(null); setDialogOpen(true); }
   function openEdit(p: ClassPricingDoc) { setEditing(p); setDialogOpen(true); }
@@ -93,26 +82,14 @@ export function ClassPricingPage() {
 
   const visible = useMemo(() => {
     const kw = filterName.trim().toLowerCase();
-    const from = filterFrom.trim();
-    const to = filterTo.trim();
-    const hasRange = from !== '' && to !== '';
-
     return rows.filter((p) => {
       if (filterBranch !== ALL && p.branchId !== filterBranch) return false;
       if (filterActive === 'active' && !p.active) return false;
       if (filterActive === 'disabled' && p.active) return false;
       if (kw && !p.className.toLowerCase().includes(kw)) return false;
-      if (hasRange && !pricingOverlapsRange(p, from, to)) return false;
-      // 單側填寫也支援：from 為下界，to 為上界
-      if (from && !to) {
-        if (p.effectiveTo !== null && p.effectiveTo < from) return false;
-      }
-      if (!from && to) {
-        if (p.effectiveFrom > to) return false;
-      }
       return true;
     });
-  }, [rows, filterBranch, filterName, filterActive, filterFrom, filterTo]);
+  }, [rows, filterBranch, filterName, filterActive]);
 
   const totalRevenue = useMemo(() => {
     return visible.reduce((sum, p) => {
@@ -161,36 +138,6 @@ export function ClassPricingPage() {
           <option value="disabled">已停用</option>
           <option value="all">全部狀態</option>
         </select>
-        <span style={styles.filterLabel}>生效期間</span>
-        <input
-          type="month"
-          value={filterFrom}
-          onChange={(e) => setFilterFrom(e.target.value)}
-          style={styles.input}
-          aria-label="生效起始月份"
-        />
-        <span style={{ alignSelf: 'center', color: '#6b7280' }}>~</span>
-        <input
-          type="month"
-          value={filterTo}
-          onChange={(e) => setFilterTo(e.target.value)}
-          style={styles.input}
-          aria-label="生效結束月份"
-        />
-        <button
-          type="button"
-          style={styles.linkBtn}
-          onClick={() => { setFilterFrom(defaultMonth()); setFilterTo(defaultMonth()); }}
-        >
-          本月
-        </button>
-        <button
-          type="button"
-          style={styles.linkBtn}
-          onClick={() => { setFilterFrom(''); setFilterTo(''); }}
-        >
-          清除期間
-        </button>
       </div>
 
       {error && <div style={styles.error}>{error}</div>}
@@ -205,17 +152,16 @@ export function ClassPricingPage() {
               <th style={styles.th}>計費方式</th>
               <th style={{ ...styles.th, textAlign: 'right' }}>目前人數</th>
               <th style={{ ...styles.th, textAlign: 'right' }}>預估營收</th>
-              <th style={styles.th}>生效期間</th>
               <th style={styles.th}>狀態</th>
               <th style={styles.th}>操作</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={9} style={styles.empty}>載入中…</td></tr>
+              <tr><td colSpan={8} style={styles.empty}>載入中…</td></tr>
             )}
             {!loading && visible.length === 0 && (
-              <tr><td colSpan={9} style={styles.empty}>沒有符合條件的定價</td></tr>
+              <tr><td colSpan={8} style={styles.empty}>沒有符合條件的定價</td></tr>
             )}
             {visible.map((p) => {
               const count = studentCounts.get(p.classId) ?? 0;
@@ -237,9 +183,6 @@ export function ClassPricingPage() {
                   <td style={{ ...styles.td, textAlign: 'right' }}>{count}</td>
                   <td style={{ ...styles.td, textAlign: 'right', fontWeight: 600 }}>
                     NT$ {TWD.format(revenue)}
-                  </td>
-                  <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
-                    {formatEffectiveRange(p)}
                   </td>
                   <td style={styles.td}>
                     <span style={p.active ? styles.pillActive : styles.pillInactive}>
@@ -279,7 +222,6 @@ const styles: Record<string, React.CSSProperties> = {
   title: { margin: 0, fontSize: '1.5rem' },
   subtitle: { margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.9rem' },
   filterBar: { display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' },
-  filterLabel: { alignSelf: 'center', color: '#6b7280', fontSize: '0.85rem', marginLeft: '0.5rem' },
   input: {
     padding: '0.5rem 0.7rem', fontSize: '0.95rem',
     border: '1px solid #d1d5db', borderRadius: 6, background: '#fff', outline: 'none',
