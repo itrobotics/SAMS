@@ -60,6 +60,11 @@ export async function createBranch(input: NewBranchInput): Promise<void> {
   await setDoc(branchRef(branchId), {
     name: input.name.trim(),
     address: input.address?.trim() ?? '',
+    servicePhone: input.servicePhone?.trim() ?? '',
+    directorName: input.directorName?.trim() ?? '',
+    directorPhone: input.directorPhone?.trim() ?? '',
+    directorLineId: input.directorLineId?.trim() ?? '',
+    notes: input.notes?.trim() ?? '',
     status: 'active',
     createdAt: serverTimestamp(),
   });
@@ -69,6 +74,11 @@ export async function updateBranch(branchId: string, patch: UpdateBranchInput): 
   const cleaned: Record<string, unknown> = {};
   if (patch.name !== undefined) cleaned.name = patch.name.trim();
   if (patch.address !== undefined) cleaned.address = patch.address.trim();
+  if (patch.servicePhone !== undefined) cleaned.servicePhone = patch.servicePhone.trim();
+  if (patch.directorName !== undefined) cleaned.directorName = patch.directorName.trim();
+  if (patch.directorPhone !== undefined) cleaned.directorPhone = patch.directorPhone.trim();
+  if (patch.directorLineId !== undefined) cleaned.directorLineId = patch.directorLineId.trim();
+  if (patch.notes !== undefined) cleaned.notes = patch.notes.trim();
   if (patch.status !== undefined) cleaned.status = patch.status;
   if (Object.keys(cleaned).length === 0) return;
   await updateDoc(branchRef(branchId), cleaned);

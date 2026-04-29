@@ -11,6 +11,11 @@ export interface BranchDoc {
   branchId: string;
   name: string;
   address: string;
+  servicePhone: string;   // 客服電話
+  directorName: string;   // 主任姓名
+  directorPhone: string;  // 主任手機
+  directorLineId: string; // 主任 Line ID
+  notes: string;          // 備註
   status: BranchStatus;
   createdAt?: Timestamp;
 }
@@ -19,11 +24,21 @@ export interface NewBranchInput {
   branchId: string;
   name: string;
   address?: string;
+  servicePhone?: string;
+  directorName?: string;
+  directorPhone?: string;
+  directorLineId?: string;
+  notes?: string;
 }
 
 export interface UpdateBranchInput {
   name?: string;
   address?: string;
+  servicePhone?: string;
+  directorName?: string;
+  directorPhone?: string;
+  directorLineId?: string;
+  notes?: string;
   status?: BranchStatus;
 }
 
