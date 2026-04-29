@@ -7,16 +7,19 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
   updateDoc,
   where,
+  writeBatch,
   type Unsubscribe,
 } from 'firebase/firestore';
 
 import { db } from './firebase';
 import { SESSIONS_COLLECTION, type SessionDoc, type SessionStatus } from '../types/session';
+import { ATTENDANCE_RECORDS_COLLECTION } from '../types/attendance';
 
 function sessionRef(sessionId: string) {
   return doc(db, SESSIONS_COLLECTION, sessionId);
@@ -86,4 +89,14 @@ export function subscribeAllSessionsForDate(
 
 export async function setSessionStatus(sessionId: string, status: SessionStatus): Promise<void> {
   await updateDoc(sessionRef(sessionId), { status });
+}
+
+export async function deleteSessionWithRecords(sessionId: string): Promise<void> {
+  const recordsSnap = await getDocs(
+    query(collection(db, ATTENDANCE_RECORDS_COLLECTION), where('sessionId', '==', sessionId)),
+  );
+  const batch = writeBatch(db);
+  for (const d of recordsSnap.docs) batch.delete(d.ref);
+  batch.delete(sessionRef(sessionId));
+  await batch.commit();
 }

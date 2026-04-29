@@ -14,6 +14,7 @@ import {
   useBranchDayAttendanceRealtime,
   useBranchDaySessionsRealtime,
 } from '../hooks/useRealtime';
+import { deleteSessionWithRecords } from '../services/sessions';
 import { ROUTES } from '../routes/paths';
 import { todayISO } from '../utils/date';
 import type { AttendanceStatus } from '../types/attendance';
@@ -35,6 +36,7 @@ export function BranchDashboardPage() {
   const { branchId } = useParams<{ branchId: string }>();
   const { branches } = useBranches();
   const [date, setDate] = useState<string>(todayISO());
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const sessionsRT = useBranchDaySessionsRealtime(branchId, date);
   const recordsRT = useBranchDayAttendanceRealtime(branchId, date);
@@ -67,6 +69,18 @@ export function BranchDashboardPage() {
     }
     return acc;
   }, [statsBySession]);
+
+  async function handleDelete(sessionId: string, label: string) {
+    if (!window.confirm(`確定刪除場次「${label}」？\n此操作無法復原，出席紀錄將一併刪除。`)) return;
+    setBusyId(sessionId);
+    try {
+      await deleteSessionWithRecords(sessionId);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '刪除失敗');
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   const isToday = date === todayISO();
 
@@ -153,6 +167,14 @@ export function BranchDashboardPage() {
                   </td>
                   <td style={styles.td}>
                     <Link to={ROUTES.session(s.sessionId)}>進入報到 →</Link>
+                    <button
+                      type="button"
+                      style={styles.deleteBtn}
+                      disabled={busyId === s.sessionId}
+                      onClick={() => handleDelete(s.sessionId, `${s.className} ${s.startTime}`)}
+                    >
+                      {busyId === s.sessionId ? '刪除中…' : '刪除'}
+                    </button>
                   </td>
                 </tr>
               );
@@ -248,4 +270,10 @@ const styles: Record<string, React.CSSProperties> = {
   td: { padding: '0.7rem 1rem', borderBottom: '1px solid #f3f4f6' },
   tdNum: { padding: '0.7rem 1rem', borderBottom: '1px solid #f3f4f6', textAlign: 'right', fontVariantNumeric: 'tabular-nums' },
   empty: { padding: '2rem', textAlign: 'center', color: '#9ca3af' },
+  deleteBtn: {
+    marginLeft: '0.5rem', padding: '0.2rem 0.5rem',
+    background: 'transparent', color: '#b91c1c',
+    border: '1px solid #fca5a5', borderRadius: 4,
+    fontSize: '0.85rem', cursor: 'pointer',
+  },
 };
