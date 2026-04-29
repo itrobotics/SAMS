@@ -10,7 +10,9 @@ import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { setClassActive, subscribeClasses } from '../services/classes';
 import { fetchAllActiveClassStudentCounts } from '../services/classStudents';
+import { subscribeInstructors } from '../services/instructors';
 import { WEEKDAY_LABELS, formatMeetingsLabel, type ClassDoc } from '../types/class';
+import type { InstructorDoc } from '../types/instructor';
 
 const ALL = '__all__';
 
@@ -26,6 +28,7 @@ export function ClassesPage() {
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'disabled'>('active');
   const [filterTeacher, setFilterTeacher] = useState('');
   const [studentCounts, setStudentCounts] = useState<Map<string, number>>(new Map());
+  const [instructorMap, setInstructorMap] = useState<Map<string, string>>(new Map());
   const [editing, setEditing] = useState<ClassDoc | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -47,6 +50,12 @@ export function ClassesPage() {
 
   useEffect(() => {
     fetchAllActiveClassStudentCounts().then(setStudentCounts).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    return subscribeInstructors({}, (list: InstructorDoc[]) => {
+      setInstructorMap(new Map(list.map((t) => [t.instructorId, t.name])));
+    });
   }, []);
 
   useEffect(() => {
@@ -171,7 +180,11 @@ export function ClassesPage() {
                   <Link to={`/classes/${c.classId}`}>{c.name}</Link>
                 </td>
                 <td style={styles.td}>{branchName(c.branchId)}</td>
-                <td style={styles.td}>{c.teacherId || '—'}</td>
+                <td style={styles.td}>
+                  {c.teacherId
+                    ? `${c.teacherId}${instructorMap.has(c.teacherId) ? `-${instructorMap.get(c.teacherId)}` : ''}`
+                    : '—'}
+                </td>
                 <td style={styles.td}>{c.classroom || '—'}</td>
                 <td style={styles.td}>{formatMeetingsLabel(c.meetings ?? [])}</td>
                 <td style={{ ...styles.td, textAlign: 'center' }}>
