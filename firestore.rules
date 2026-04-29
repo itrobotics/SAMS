@@ -56,5 +56,7 @@ service cloud.firestore {
     match /face_checkin_attempts/{id}  { allow read, write: if signedIn(); }
     match /leave_requests/{id}         { allow read, write: if signedIn(); }
     match /logs/{id}                   { allow read, write: if signedIn(); }
+    match /instructors/{id}            { allow read, write: if signedIn(); }
+    match /app_options/{id}            { allow read, write: if signedIn(); }
   }
 }
