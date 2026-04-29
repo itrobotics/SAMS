@@ -11,6 +11,7 @@ import type { Timestamp } from 'firebase/firestore';
 export const COURSE_ATTENDANCE_COLLECTION = 'course_attendance';
 
 export const COURSE_ATTENDANCE_STATUSES = [
+  'SCHEDULED',
   'CHECKED_IN',
   'LATE',
   'LEAVE',
@@ -19,6 +20,7 @@ export const COURSE_ATTENDANCE_STATUSES = [
 export type CourseAttendanceStatus = (typeof COURSE_ATTENDANCE_STATUSES)[number];
 
 export const COURSE_ATTENDANCE_STATUS_LABELS: Record<CourseAttendanceStatus, string> = {
+  SCHEDULED: '應到',
   CHECKED_IN: '已到',
   LATE: '遲到',
   LEAVE: '請假',
@@ -26,6 +28,7 @@ export const COURSE_ATTENDANCE_STATUS_LABELS: Record<CourseAttendanceStatus, str
 };
 
 export const COURSE_ATTENDANCE_STATUS_COLORS: Record<CourseAttendanceStatus, { bg: string; fg: string }> = {
+  SCHEDULED:  { bg: '#f3f4f6', fg: '#6b7280' },
   CHECKED_IN: { bg: '#dcfce7', fg: '#166534' },
   LATE:       { bg: '#fef3c7', fg: '#92400e' },
   LEAVE:      { bg: '#dbeafe', fg: '#1e40af' },

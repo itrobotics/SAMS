@@ -83,7 +83,7 @@ export function CourseSessionPage() {
 
   const counts = useMemo(() => {
     const acc: Record<CourseAttendanceStatus, number> = {
-      CHECKED_IN: 0, LATE: 0, LEAVE: 0, ABSENT: 0,
+      SCHEDULED: 0, CHECKED_IN: 0, LATE: 0, LEAVE: 0, ABSENT: 0,
     };
     for (const r of records) acc[r.status] += 1;
     return acc;
@@ -134,7 +134,7 @@ export function CourseSessionPage() {
         <SummaryPill label="已到" value={counts.CHECKED_IN + counts.LATE} status="CHECKED_IN" />
         <SummaryPill label="遲到" value={counts.LATE} status="LATE" />
         <SummaryPill label="請假" value={counts.LEAVE} status="LEAVE" />
-        <SummaryPill label="未到" value={counts.ABSENT} status="ABSENT" />
+        <SummaryPill label="未到" value={counts.ABSENT + counts.SCHEDULED} status="ABSENT" />
       </div>
 
       <div style={styles.tableWrap}>
@@ -190,16 +190,21 @@ function ActionButtons({
 }) {
   return (
     <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
-      {COURSE_ATTENDANCE_STATUSES.map((s) => (
-        <ActionBtn
-          key={s}
-          label={COURSE_ATTENDANCE_STATUS_LABELS[s]}
-          active={record.status === s}
-          accent={COURSE_ATTENDANCE_STATUS_COLORS[s].fg}
-          disabled={busy}
-          onClick={() => onSet(record, s)}
-        />
-      ))}
+      {COURSE_ATTENDANCE_STATUSES.map((s) => {
+        // SCHEDULED 是「重設」用的按鈕：已經是 SCHEDULED 時不必再點
+        const isCurrent = record.status === s;
+        const isReset = s === 'SCHEDULED';
+        return (
+          <ActionBtn
+            key={s}
+            label={isReset ? '重設' : COURSE_ATTENDANCE_STATUS_LABELS[s]}
+            active={isCurrent}
+            accent={COURSE_ATTENDANCE_STATUS_COLORS[s].fg}
+            disabled={busy || (isReset && isCurrent)}
+            onClick={() => onSet(record, s)}
+          />
+        );
+      })}
     </div>
   );
 }

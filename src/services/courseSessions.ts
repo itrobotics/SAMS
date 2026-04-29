@@ -122,7 +122,7 @@ export async function createCourseSession(input: NewCourseSessionInput): Promise
       branchId: input.branchId,
       studentId: en.studentId,
       studentName: en.studentName,
-      status: 'ABSENT',
+      status: 'SCHEDULED',
       checkinTime: null,
       method: 'MANUAL',
       operatorId: null,
