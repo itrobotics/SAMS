@@ -84,6 +84,7 @@ Face Recognition: Python Module API
 | M10 | 通知模組 |
 | M11 | 報表分析模組 |
 | M12 | 系統設定模組 |
+| M13 | 班級定價表模組 |
 
 ---
 
@@ -386,6 +387,53 @@ Firestore
 
 ---
 
+## M13 班級定價表模組
+
+### 用途
+
+維護各班級的「每人費用」與計費方式，並依當前班級人數即時估算營收。屬營運分析輔助模組（不參與排課 / 報到流程）。
+
+### 欄位
+
+```json
+{
+  "pricingId": "PR000001",
+  "classId": "C001",
+  "branchId": "anhe",
+  "className": "Scratch 初階班",
+  "price": 3000,
+  "priceType": "per_class | per_month | per_session | batch",
+  "notes": "",
+  "active": true
+}
+```
+
+> `className` 為 denormalized 欄位（從 classes 寫入時複製進來），列表免再 join。
+
+### 計費方式
+
+| priceType | 顯示 | 說明 |
+|---|---|---|
+| `per_class` | 每班次 | 整個班次（一期）一筆費用 |
+| `per_month` | 每月 | 每人每月收費 |
+| `per_session` | 每堂 | 每人每堂收費 |
+| `batch` | batch | 整批計費 |
+
+### 功能
+
+- 新增 / 編輯 / 停用定價（同一班級可有多筆，例如優惠價、舊價）
+- 依分校、班名、啟用狀態篩選
+- 列表顯示「目前人數 × 定價 = 預估營收」與啟用中合計
+- 預估營收 = `price × 該班 class_students.active 人數`（client 端計算，不寫回）
+
+### 權限
+
+- `hq_admin`：所有分校
+- `branch_admin`：本分校
+- 其他角色：無導覽入口（路由也預設要登入）
+
+---
+
 ## 4. Firestore Collections
 
 ```text
@@ -393,6 +441,8 @@ branches
 users
 students
 classes
+class_students
+class_pricing
 sessions
 attendance_records
 face_profiles

@@ -943,6 +943,105 @@ active face_profiles
 
 ---
 
+# Phase 16｜進階管理模組（MVP 後續迭代）
+
+## 目標
+
+在 MVP 主流程穩定後，加入營運分析與管理輔助功能。本 phase 與排課 / 報到流程獨立，可分階段交付。
+
+## Tasks
+
+### Task 065｜建立班級定價表模組
+
+對應產品 spec **M13 班級定價表模組**。
+
+新增檔案：
+
+- `src/types/classPricing.ts` — `ClassPricingDoc` 型別、`PriceType` 列舉
+- `src/services/classPricing.ts` — Firestore CRUD + `subscribeClassPricing({ branchIds, classId?, activeOnly? })`，內建 6 位 `PRnnnnnn` 流水號產生器
+- `src/components/ClassPricingFormDialog.tsx` — 新增 / 編輯表單
+- `src/pages/ClassPricingPage.tsx` — 列表 + 篩選 + 預估營收
+
+修改檔案：
+
+- `src/routes/paths.ts` — 加入 `classPricing: '/class-pricing'`
+- `src/routes/AppRouter.tsx` — 註冊路由
+- `src/components/AppLayout.tsx` — 導覽列加「定價表」（HQ Admin / Branch Admin 可見）
+- `firestore.rules` — 加入 `class_pricing` collection 規則（沿用「登入即可讀寫」）
+
+#### Firestore：`class_pricing`
+
+```ts
+{
+  pricingId: string,                                       // 自動產生 PRnnnnnn
+  classId: string,
+  branchId: string,
+  className: string,                                        // denormalized
+  price: number,                                            // TWD，每人費用
+  priceType: 'per_class' | 'per_month' | 'per_session' | 'batch',
+  notes: string,
+  active: boolean,
+  createdAt: timestamp,
+  createdBy: string
+}
+```
+
+#### 計費方式
+
+- **per_class — 每班次**：整個班次（一期）一筆費用
+- **per_month — 每月**：每人每月收費
+- **per_session — 每堂**：每人每堂收費
+- **batch**：整批計費
+
+#### 列表欄位
+
+| 班級名稱 | 分校 | 定價/人 | 計費方式 | 目前人數 | 預估營收 | 狀態 | 操作 |
+
+- 預估營收 = `price × class_students.active 人數`（client 端計算）
+- header 顯示「啟用中預估營收合計 NT$ ...」
+
+#### 篩選
+
+- 分校（角色過濾後）
+- 班級名稱（client 端 substring）
+- 啟用狀態：啟用中（預設）/ 已停用 / 全部
+
+#### 設計決策
+
+- 同一 classId 可有多筆定價（例如優惠價、舊價、不同方案）；不以「生效期間」區分，改以 `active` 控制是否納入估算
+- `className` denormalized，列表免再 join classes
+- `pricingId` 用 6 位流水號（`autoId.ts` 只支援 3 位，service 內建獨立生成器）
+
+---
+
+### Task 066｜統一班級期間 Filter
+
+#### 動機
+
+ClassesPage 與 InstructorSchedulePage 原本各自實作「今日 / 本週 / 本月 / 上月 / 下月 / 自訂期間」加上自訂日期區間 UI；經實際使用後改為 6 個固定 preset，邏輯改成「指定欄位的月 / 季是否落在某個月 / 季」。
+
+#### 期間選項（兩頁共用）
+
+| 選項 | 規則 |
+|---|---|
+| 全部（預設） | 不過濾 |
+| 本月開課 | 月(`courseStartDate`) === 本月 |
+| 本月結束 | 月(`courseEndDate`) === 本月 |
+| 上月開課 | 月(`courseStartDate`) === 上月 |
+| 下月結束 | 月(`courseEndDate`) === 下月 |
+| 本季開課 | 季(`courseStartDate`) === 本季 |
+| 本季結束 | 季(`courseEndDate`) === 本季 |
+
+> 季：1-3 月 = Q1，4-6 月 = Q2，7-9 月 = Q3，10-12 月 = Q4。
+> 未填對應日期的班級在非「全部」preset 下會被排除。
+
+#### 新增 / 修改檔案
+
+- 新增 `src/utils/coursePeriodFilter.ts` — `CoursePeriodPreset` 型別、`COURSE_PERIOD_OPTIONS` 陣列、`matchesCoursePeriod(preset, courseStartDate, courseEndDate, now?)`
+- 修改 `src/pages/ClassesPage.tsx` 與 `src/pages/InstructorSchedulePage.tsx`：移除舊 `getPresetRange` / `overlapsPeriod` / 自訂日期區間 UI，改用共用 util
+
+---
+
 # 建議開發順序總表
 
 | Phase | 名稱 | 優先度 |
@@ -963,6 +1062,7 @@ active face_profiles
 | Phase 13 | 報表分析 | P2 |
 | Phase 14 | 系統設定 | P2 |
 | Phase 15 | 測試與上線 | P0 |
+| Phase 16 | 進階管理模組（定價、Filter 統一等） | P2 |
 
 ---
 

@@ -36,6 +36,9 @@ Python Face Recognition API
 /kiosk/:branchId
 /students
 /classes
+/class-pricing
+/instructors
+/instructor-schedule
 /reports
 /settings
 ```
@@ -145,6 +148,28 @@ Python Face Recognition API
   createdAt: timestamp
 }
 ```
+
+## class_pricing
+
+```ts
+{
+  pricingId: string,                                       // 自動產生 PRnnnnnn（6 位）
+  classId: string,
+  branchId: string,
+  className: string,                                        // denormalized
+  price: number,                                            // TWD，每人費用
+  priceType: 'per_class' | 'per_month' | 'per_session' | 'batch',
+  notes: string,
+  active: boolean,
+  createdAt: timestamp,
+  createdBy: string                                         // user.userId
+}
+```
+
+> 同一 classId 可有多筆（例如優惠價、舊價）；以 `active` 控制是否納入營收估算。
+> 預估營收 = `price × 該班 class_students.active 人數`，由 client 計算，不寫回 Firestore。
+
+Firestore rules 在 MVP 階段沿用「登入即可讀寫」；分校隔離由 client 端 `where('branchId', 'in', user.branchIds)` 控制。
 
 ---
 
