@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit*)",
+            "command": "if git diff HEAD~1 HEAD --name-only 2>/dev/null | grep -q 'firestore.rules'; then npx firebase deploy --only firestore:rules; fi",
+            "timeout": 60,
+            "statusMessage": "firestore.rules 有變動，自動部署規則中…"
+          }
+        ]
+      }
+    ]
+  }
+}
