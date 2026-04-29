@@ -11,6 +11,7 @@ import { StudentDetailPage } from '../pages/StudentDetailPage';
 import { ClassesPage } from '../pages/ClassesPage';
 import { ClassDetailPage } from '../pages/ClassDetailPage';
 import { InstructorsPage } from '../pages/InstructorsPage';
+import { InstructorSchedulePage } from '../pages/InstructorSchedulePage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { OptionsPage } from '../pages/OptionsPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
@@ -102,6 +103,14 @@ export function AppRouter() {
           element={
             <AuthGuard>
               <InstructorsPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.instructorSchedule}
+          element={
+            <AuthGuard>
+              <InstructorSchedulePage />
             </AuthGuard>
           }
         />
