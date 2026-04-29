@@ -37,8 +37,12 @@ export interface ClassDoc {
   classId: string;
   branchId: string;
   name: string;
-  teacherId: string;          // 預設老師
+  teacherId: string;          // 預設講師
   classroom: string;          // 預設教室
+  courseType: string;         // 課程類型
+  courseStartDate: string;    // "YYYY-MM-DD" or ""
+  courseEndDate: string;      // "YYYY-MM-DD" or ""
+  courseHours: number;        // 總上課時數
   meetings: ClassMeeting[];   // 至少一筆；同 weekday 可有多筆但不可重疊
   weekdays: number[];         // 衍生：去重排序，給 array-contains 用
   active: boolean;
@@ -51,7 +55,12 @@ export interface NewClassInput {
   name: string;
   teacherId?: string;
   classroom?: string;
+  courseType?: string;
+  courseStartDate?: string;
+  courseEndDate?: string;
+  courseHours?: number;
   meetings: ClassMeeting[];
+  active?: boolean;
 }
 
 export interface UpdateClassInput {
@@ -59,6 +68,10 @@ export interface UpdateClassInput {
   name?: string;
   teacherId?: string;
   classroom?: string;
+  courseType?: string;
+  courseStartDate?: string;
+  courseEndDate?: string;
+  courseHours?: number;
   meetings?: ClassMeeting[];
   active?: boolean;
 }

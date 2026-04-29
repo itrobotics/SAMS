@@ -126,9 +126,13 @@ export async function createClass(input: NewClassInput): Promise<void> {
     name: input.name.trim(),
     teacherId: input.teacherId?.trim() ?? '',
     classroom: input.classroom?.trim() ?? '',
+    courseType: input.courseType?.trim() ?? '',
+    courseStartDate: input.courseStartDate?.trim() ?? '',
+    courseEndDate: input.courseEndDate?.trim() ?? '',
+    courseHours: input.courseHours ?? 0,
     meetings,
     weekdays,
-    active: true,
+    active: input.active ?? true,
     createdAt: serverTimestamp(),
   });
 }
@@ -145,6 +149,10 @@ export async function updateClass(classId: string, patch: UpdateClassInput): Pro
     cleaned.meetings = sorted.map(stripMeeting);
     cleaned.weekdays = deriveWeekdays(sorted);
   }
+  if (patch.courseType !== undefined) cleaned.courseType = patch.courseType.trim();
+  if (patch.courseStartDate !== undefined) cleaned.courseStartDate = patch.courseStartDate.trim();
+  if (patch.courseEndDate !== undefined) cleaned.courseEndDate = patch.courseEndDate.trim();
+  if (patch.courseHours !== undefined) cleaned.courseHours = patch.courseHours;
   if (patch.active !== undefined) cleaned.active = patch.active;
   if (Object.keys(cleaned).length === 0) return;
   await updateDoc(classRef(classId), cleaned);

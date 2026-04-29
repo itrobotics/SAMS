@@ -1,8 +1,4 @@
-// 班級新增 / 編輯表單（多時段版，updated Task 053）
-//
-// 一個班級可有多組 meetings，每組指定 weekday + 時段，並可選擇性 override
-// 教室 / 老師。同一 weekday 可有多筆（如週一 AM / 週一 PM 不同老師），
-// 但時段不可重疊。
+// 班級新增 / 編輯表單（多時段版，updated Task 058）
 
 import { useEffect, useState, type FormEvent } from 'react';
 
@@ -45,6 +41,9 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
   const [teacherId, setTeacherId] = useState('');
   const [classroom, setClassroom] = useState('');
   const [courseType, setCourseType] = useState('');
+  const [courseStartDate, setCourseStartDate] = useState('');
+  const [courseEndDate, setCourseEndDate] = useState('');
+  const [courseHours, setCourseHours] = useState('');
   const [meetings, setMeetings] = useState<ClassMeeting[]>([DEFAULT_MEETING]);
   const [active, setActive] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -68,6 +67,9 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
     setTeacherId(initial?.teacherId ?? '');
     setClassroom(initial?.classroom ?? '');
     setCourseType(initial?.courseType ?? '');
+    setCourseStartDate(initial?.courseStartDate ?? '');
+    setCourseEndDate(initial?.courseEndDate ?? '');
+    setCourseHours(initial?.courseHours ? String(initial.courseHours) : '');
     setMeetings(
       initial?.meetings && initial.meetings.length > 0
         ? initial.meetings.map((m) => ({ ...m }))
@@ -106,17 +108,19 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
     }
     if (!branchId) return setError('請選擇分校');
     if (!name.trim()) return setError('請填寫班級名稱');
+    const hours = courseHours === '' ? 0 : Number(courseHours);
+    if (Number.isNaN(hours) || hours < 0) return setError('上課時數請填寫正整數');
     setSubmitting(true);
     setError(null);
     try {
+      const common = {
+        branchId, name, teacherId, classroom, courseType,
+        courseStartDate, courseEndDate, courseHours: hours, meetings, active,
+      };
       if (isEdit && initial) {
-        await updateClass(initial.classId, {
-          branchId, name, teacherId, classroom, courseType, meetings, active,
-        });
+        await updateClass(initial.classId, common);
       } else {
-        await createClass({
-          classId, branchId, name, teacherId, classroom, courseType, meetings,
-        });
+        await createClass({ classId, ...common });
       }
       onSaved();
       onClose();
@@ -132,31 +136,28 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
       <form onSubmit={handleSubmit}>
         {error && <div style={formStyles.error}>{error}</div>}
 
+        {/* 班級代碼 + 名稱 */}
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <div style={{ ...formStyles.field, flex: 1 }}>
             <label style={formStyles.label}>班級代碼<span style={formStyles.required}>*</span></label>
             <input
               style={{ ...formStyles.input, background: '#f9fafb' }}
-              value={classId}
-              readOnly
-              placeholder="載入中…"
-              disabled={submitting}
-              required
+              value={classId} readOnly placeholder="載入中…"
+              disabled={submitting} required
             />
           </div>
           <div style={{ ...formStyles.field, flex: 2 }}>
             <label style={formStyles.label}>班級名稱<span style={formStyles.required}>*</span></label>
             <input
-              style={formStyles.input}
-              value={name}
+              style={formStyles.input} value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例：Scratch 全期班"
-              disabled={submitting}
-              required
+              disabled={submitting} required
             />
           </div>
         </div>
 
+        {/* 分校 + 課程類型 */}
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <div style={{ ...formStyles.field, flex: 1 }}>
             <label style={formStyles.label}>分校<span style={formStyles.required}>*</span></label>
@@ -180,9 +181,33 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
           </div>
         </div>
 
+        {/* 課程起訖 + 上課時數 */}
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <div style={{ ...formStyles.field, flex: 1 }}>
-            <label style={formStyles.label}>預設老師</label>
+            <label style={formStyles.label}>課程開始日</label>
+            <input type="date" style={formStyles.input} value={courseStartDate}
+              onChange={(e) => setCourseStartDate(e.target.value)} disabled={submitting} />
+          </div>
+          <div style={{ ...formStyles.field, flex: 1 }}>
+            <label style={formStyles.label}>課程結束日</label>
+            <input type="date" style={formStyles.input} value={courseEndDate}
+              onChange={(e) => setCourseEndDate(e.target.value)} disabled={submitting} />
+          </div>
+          <div style={{ ...formStyles.field, flex: '0 0 130px' }}>
+            <label style={formStyles.label}>總上課時數</label>
+            <input
+              type="number" min={0} step={1}
+              style={formStyles.input} value={courseHours}
+              onChange={(e) => setCourseHours(e.target.value)}
+              placeholder="0" disabled={submitting}
+            />
+          </div>
+        </div>
+
+        {/* 預設講師 + 預設教室 */}
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ ...formStyles.field, flex: 1 }}>
+            <label style={formStyles.label}>預設講師</label>
             <select style={formStyles.select} value={teacherId}
               onChange={(e) => setTeacherId(e.target.value)} disabled={submitting}>
               <option value="">（未指定）</option>
@@ -197,22 +222,21 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
           <div style={{ ...formStyles.field, flex: 1 }}>
             <label style={formStyles.label}>預設教室</label>
             <input
-              style={formStyles.input}
-              value={classroom}
+              style={formStyles.input} value={classroom}
               onChange={(e) => setClassroom(e.target.value)}
-              placeholder="例：301"
-              disabled={submitting}
+              placeholder="例：301" disabled={submitting}
             />
             <span style={formStyles.hint}>個別時段可在下方覆蓋</span>
           </div>
         </div>
 
+        {/* 上課時段 */}
         <fieldset style={meetingsBoxStyle}>
           <legend style={legendStyle}>
             上課時段<span style={formStyles.required}>*</span>
           </legend>
           <p style={{ ...formStyles.hint, margin: '0 0 0.5rem' }}>
-            可設定多組時段；同一上課日可分成早/晚（不可重疊）。教室或老師留白即沿用上方預設。
+            可設定多組時段；同一上課日可分成早/晚（不可重疊）。教室或講師留白即沿用上方預設。
           </p>
           {meetings.map((m, idx) => (
             <MeetingRow
@@ -230,15 +254,14 @@ export function ClassFormDialog({ open, initial, onClose, onSaved }: ClassFormDi
           </button>
         </fieldset>
 
-        {isEdit && (
-          <div style={formStyles.field}>
-            <label style={{ ...formStyles.label, display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <input type="checkbox" checked={active}
-                onChange={(e) => setActive(e.target.checked)} disabled={submitting} />
-              啟用此班級（取消勾選等同停用，當日場次不會產生）
-            </label>
-          </div>
-        )}
+        {/* 狀態（新增/編輯都顯示） */}
+        <div style={formStyles.field}>
+          <label style={{ ...formStyles.label, display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <input type="checkbox" checked={active}
+              onChange={(e) => setActive(e.target.checked)} disabled={submitting} />
+            啟用此班級（取消勾選等同停用，當日場次不會產生）
+          </label>
+        </div>
 
         <div style={formStyles.actions}>
           <button type="button" style={formStyles.btnSecondary} onClick={onClose} disabled={submitting}>
@@ -313,13 +336,13 @@ function MeetingRow({ meeting, instructors, canDelete, disabled, onChange, onRem
           disabled={disabled}
         />
         <select
-          aria-label="老師（可空）"
+          aria-label="講師（可空）"
           style={{ ...formStyles.select, flex: 1 }}
           value={meeting.teacherId ?? ''}
           onChange={(e) => onChange({ teacherId: e.target.value || undefined })}
           disabled={disabled}
         >
-          <option value="">老師（沿用預設）</option>
+          <option value="">講師（沿用預設）</option>
           {instructors.map((t) => (
             <option key={t.instructorId} value={t.instructorId}>
               {t.instructorId}-{t.name}
