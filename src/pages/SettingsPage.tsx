@@ -3,7 +3,7 @@
 // 目前 MVP 用途：手動觸發「產生今日場次」。
 // Phase 14 會改為各分校可調整的 settings collection（graceMinutes 等）。
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
@@ -11,6 +11,8 @@ import {
   generateSessionsForDate,
   type GenerationSummary,
 } from '../services/sessionGenerator';
+import { fetchBranchSettings, saveBranchSettings } from '../services/settings';
+import { DEFAULT_BRANCH_SETTINGS } from '../types/settings';
 import { todayISO } from '../utils/date';
 
 const ALL = '__all__';
@@ -29,6 +31,41 @@ export function SettingsPage() {
     () => (isHQ ? branches : branches.filter((b) => user?.branchIds.includes(b.branchId))),
     [branches, user, isHQ],
   );
+
+  // 遲到寬限設定
+  const [graceBranchId, setGraceBranchId] = useState<string>('');
+  const [graceMinutes, setGraceMinutes] = useState<number>(DEFAULT_BRANCH_SETTINGS.graceMinutes);
+  const [graceSaving, setGraceSaving] = useState(false);
+  const [graceSaved, setGraceSaved] = useState(false);
+  const [graceError, setGraceError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (branchOptions.length > 0 && !graceBranchId) {
+      setGraceBranchId(branchOptions[0].branchId);
+    }
+  }, [branchOptions, graceBranchId]);
+
+  useEffect(() => {
+    if (!graceBranchId) return;
+    fetchBranchSettings(graceBranchId).then((s) => setGraceMinutes(s.graceMinutes));
+    setGraceSaved(false);
+    setGraceError(null);
+  }, [graceBranchId]);
+
+  async function handleSaveGrace() {
+    if (!graceBranchId) return;
+    setGraceSaving(true);
+    setGraceError(null);
+    setGraceSaved(false);
+    try {
+      await saveBranchSettings(graceBranchId, { graceMinutes });
+      setGraceSaved(true);
+    } catch (e) {
+      setGraceError(e instanceof Error ? e.message : '儲存失敗');
+    } finally {
+      setGraceSaving(false);
+    }
+  }
 
   async function handleGenerate() {
     setRunning(true);
@@ -56,9 +93,6 @@ export function SettingsPage() {
     <section>
       <header style={styles.header}>
         <h1 style={styles.title}>系統設定</h1>
-        <p style={styles.subtitle}>
-          MVP 階段僅開放手動產生場次；其他設定（遲到寬限、人臉門檻）將於 Phase 14 加入。
-        </p>
       </header>
 
       <article style={styles.card}>
@@ -119,6 +153,47 @@ export function SettingsPage() {
           </div>
         )}
       </article>
+
+      <article style={{ ...styles.card, marginTop: '1.5rem' }}>
+        <h2 style={styles.h2}>遲到寬限設定</h2>
+        <p style={styles.help}>
+          上課開始後幾分鐘內報到仍視為「準時」；超過則自動標記為「遲到」。
+        </p>
+        <div style={styles.formRow}>
+          {branchOptions.length > 1 && (
+            <label style={styles.field}>
+              <span style={styles.label}>分校</span>
+              <select
+                value={graceBranchId}
+                onChange={(e) => setGraceBranchId(e.target.value)}
+                disabled={graceSaving}
+                style={styles.input}
+              >
+                {branchOptions.map((b) => (
+                  <option key={b.branchId} value={b.branchId}>{b.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label style={styles.field}>
+            <span style={styles.label}>寬限分鐘數</span>
+            <input
+              type="number"
+              min={0}
+              max={60}
+              value={graceMinutes}
+              onChange={(e) => { setGraceMinutes(Number(e.target.value)); setGraceSaved(false); }}
+              disabled={graceSaving}
+              style={{ ...styles.input, width: 80 }}
+            />
+          </label>
+          <button type="button" style={styles.btn} onClick={handleSaveGrace} disabled={graceSaving}>
+            {graceSaving ? '儲存中…' : '儲存'}
+          </button>
+          {graceSaved && <span style={{ color: '#166534', fontSize: '0.9rem', alignSelf: 'center' }}>已儲存</span>}
+        </div>
+        {graceError && <div style={styles.error}>{graceError}</div>}
+      </article>
     </section>
   );
 }
@@ -126,7 +201,7 @@ export function SettingsPage() {
 const styles: Record<string, React.CSSProperties> = {
   header: { marginBottom: '1.5rem' },
   title: { margin: 0, fontSize: '1.5rem' },
-  subtitle: { margin: '0.4rem 0 0', color: '#6b7280', fontSize: '0.9rem' },
+  subtitle: { margin: '0.4rem 0 0', color: '#6b7280', fontSize: '0.9rem', maxWidth: 720 },
   card: {
     background: '#fff', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
     padding: '1.5rem', maxWidth: 720,

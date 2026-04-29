@@ -2,7 +2,7 @@
 //
 // 取不到設定 → 回傳預設值，不阻塞報到流程。
 
-import { doc, getDoc, onSnapshot, type Unsubscribe } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc, type Unsubscribe } from 'firebase/firestore';
 
 import { db } from './firebase';
 import {
@@ -17,6 +17,13 @@ export async function fetchBranchSettings(branchId: string): Promise<BranchSetti
     return { branchId, ...DEFAULT_BRANCH_SETTINGS };
   }
   return { branchId, ...DEFAULT_BRANCH_SETTINGS, ...(snap.data() as Partial<BranchSettings>) };
+}
+
+export async function saveBranchSettings(
+  branchId: string,
+  patch: Partial<Omit<BranchSettings, 'branchId'>>,
+): Promise<void> {
+  await setDoc(doc(db, SETTINGS_COLLECTION, branchId), patch, { merge: true });
 }
 
 export function subscribeBranchSettings(
