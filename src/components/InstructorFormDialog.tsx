@@ -1,4 +1,4 @@
-// 講師新增 / 編輯表單（Task 046）
+// 講師新增 / 編輯表單（Task 046, updated Task 050）
 
 import { useEffect, useState, type FormEvent } from 'react';
 
@@ -8,8 +8,10 @@ import { subscribeOptions } from '../services/appOptions';
 import { createInstructor, updateInstructor } from '../services/instructors';
 import { OPTION_KEYS } from '../types/appOptions';
 import {
+  GENDER_LABELS,
   INSTRUCTORS_COLLECTION,
   SCHOOL_STATUS_LABELS,
+  type Gender,
   type InstructorDoc,
   type SchoolStatus,
 } from '../types/instructor';
@@ -23,6 +25,7 @@ interface InstructorFormDialogProps {
 }
 
 const SCHOOL_STATUSES: SchoolStatus[] = ['graduated', 'dropped', 'enrolled'];
+const GENDERS: Gender[] = ['male', 'female', 'other'];
 
 export function InstructorFormDialog({
   open,
@@ -37,6 +40,7 @@ export function InstructorFormDialog({
 
   const [instructorId, setInstructorId] = useState('');
   const [name, setName] = useState('');
+  const [gender, setGender] = useState<Gender>('male');
   const [courses, setCourses] = useState<string[]>([]);
   const [education, setEducation] = useState('');
   const [schoolStatus, setSchoolStatus] = useState<SchoolStatus>('graduated');
@@ -45,11 +49,15 @@ export function InstructorFormDialog({
   const [grade, setGrade] = useState('');
   const [phone1, setPhone1] = useState('');
   const [phone2, setPhone2] = useState('');
+  const [mailingCity, setMailingCity] = useState('');
   const [mailingAddress, setMailingAddress] = useState('');
   const [registeredSame, setRegisteredSame] = useState(true);
+  const [registeredCity, setRegisteredCity] = useState('');
   const [registeredAddress, setRegisteredAddress] = useState('');
   const [ecName, setEcName] = useState('');
   const [ecRelation, setEcRelation] = useState('');
+  const [hourlyRate, setHourlyRate] = useState('');
+  const [notes, setNotes] = useState('');
   const [active, setActive] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +76,7 @@ export function InstructorFormDialog({
       setInstructorId(initial.instructorId);
     }
     setName(initial?.name ?? '');
+    setGender(initial?.gender ?? 'male');
     setCourses(initial?.courses ?? []);
     setEducation(initial?.education ?? '');
     setSchoolStatus(initial?.schoolStatus ?? 'graduated');
@@ -76,11 +85,15 @@ export function InstructorFormDialog({
     setGrade(initial?.grade ?? '');
     setPhone1(initial?.phone1 ?? '');
     setPhone2(initial?.phone2 ?? '');
+    setMailingCity(initial?.mailingCity ?? '');
     setMailingAddress(initial?.mailingAddress ?? '');
     setRegisteredSame(initial?.registeredAddressSameAsMailing ?? true);
+    setRegisteredCity(initial?.registeredCity ?? '');
     setRegisteredAddress(initial?.registeredAddress ?? '');
     setEcName(initial?.emergencyContactName ?? '');
     setEcRelation(initial?.emergencyContactRelation ?? '');
+    setHourlyRate(initial?.hourlyRate ?? '');
+    setNotes(initial?.notes ?? '');
     setActive(initial?.active ?? true);
     setError(null);
   }, [open, initial]);
@@ -103,6 +116,7 @@ export function InstructorFormDialog({
       const payload = {
         instructorId: instructorId.trim(),
         name: name.trim(),
+        gender,
         courses,
         education,
         schoolStatus,
@@ -111,11 +125,16 @@ export function InstructorFormDialog({
         grade: schoolStatus === 'enrolled' ? grade : '',
         phone1,
         phone2,
+        mailingCity,
         mailingAddress,
         registeredAddressSameAsMailing: registeredSame,
+        registeredCity: registeredSame ? '' : registeredCity,
         registeredAddress: registeredSame ? '' : registeredAddress,
         emergencyContactName: ecName,
         emergencyContactRelation: ecRelation,
+        hourlyRate,
+        totalTeachingHours: initial?.totalTeachingHours ?? 0,
+        notes,
         active,
       };
       if (isEdit && initial) {
@@ -134,7 +153,7 @@ export function InstructorFormDialog({
   }
 
   return (
-    <Modal open={open} title={isEdit ? '編輯講師' : '新增講師'} onClose={onClose} width={600}>
+    <Modal open={open} title={isEdit ? '編輯講師' : '新增講師'} onClose={onClose} width={620}>
       <form onSubmit={handleSubmit}>
         {error && <div style={formStyles.error}>{error}</div>}
 
@@ -167,6 +186,24 @@ export function InstructorFormDialog({
               required
             />
           </div>
+          <div style={{ ...formStyles.field, flex: 1 }}>
+            <label style={formStyles.label}>性別</label>
+            <div style={{ display: 'flex', gap: '0.75rem', paddingTop: 6 }}>
+              {GENDERS.map((g) => (
+                <label key={g} style={checkboxLabel}>
+                  <input
+                    type="radio"
+                    name="gender"
+                    value={g}
+                    checked={gender === g}
+                    onChange={() => setGender(g)}
+                    disabled={submitting}
+                  />
+                  {GENDER_LABELS[g]}
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* 可教授課程 */}
@@ -195,27 +232,16 @@ export function InstructorFormDialog({
         <div style={row2}>
           <div style={{ ...formStyles.field, flex: 1 }}>
             <label style={formStyles.label}>最高學歷</label>
-            <input
-              style={formStyles.input}
-              value={education}
-              onChange={(e) => setEducation(e.target.value)}
-              placeholder="例：碩士"
-              disabled={submitting}
-            />
+            <input style={formStyles.input} value={education}
+              onChange={(e) => setEducation(e.target.value)} placeholder="例：碩士" disabled={submitting} />
           </div>
-          <div style={{ ...formStyles.field, flex: 1 }}>
+          <div style={{ ...formStyles.field, flex: 2 }}>
             <label style={formStyles.label}>就學狀態</label>
             <div style={{ display: 'flex', gap: '1rem', paddingTop: 6 }}>
               {SCHOOL_STATUSES.map((s) => (
                 <label key={s} style={checkboxLabel}>
-                  <input
-                    type="radio"
-                    name="schoolStatus"
-                    value={s}
-                    checked={schoolStatus === s}
-                    onChange={() => setSchoolStatus(s)}
-                    disabled={submitting}
-                  />
+                  <input type="radio" name="schoolStatus" value={s}
+                    checked={schoolStatus === s} onChange={() => setSchoolStatus(s)} disabled={submitting} />
                   {SCHOOL_STATUS_LABELS[s]}
                 </label>
               ))}
@@ -225,34 +251,19 @@ export function InstructorFormDialog({
         <div style={row3}>
           <div style={{ ...formStyles.field, flex: 2 }}>
             <label style={formStyles.label}>學校名稱</label>
-            <input
-              style={formStyles.input}
-              value={schoolName}
-              onChange={(e) => setSchoolName(e.target.value)}
-              placeholder="例：國立台灣大學"
-              disabled={submitting}
-            />
+            <input style={formStyles.input} value={schoolName}
+              onChange={(e) => setSchoolName(e.target.value)} placeholder="例：國立台灣大學" disabled={submitting} />
           </div>
           <div style={{ ...formStyles.field, flex: 2 }}>
             <label style={formStyles.label}>科系</label>
-            <input
-              style={formStyles.input}
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              placeholder="例：資訊工程學系"
-              disabled={submitting}
-            />
+            <input style={formStyles.input} value={department}
+              onChange={(e) => setDepartment(e.target.value)} placeholder="例：資訊工程學系" disabled={submitting} />
           </div>
           {schoolStatus === 'enrolled' && (
             <div style={{ ...formStyles.field, flex: 1 }}>
               <label style={formStyles.label}>年級</label>
-              <input
-                style={formStyles.input}
-                value={grade}
-                onChange={(e) => setGrade(e.target.value)}
-                placeholder="例：大三"
-                disabled={submitting}
-              />
+              <input style={formStyles.input} value={grade}
+                onChange={(e) => setGrade(e.target.value)} placeholder="例：大三" disabled={submitting} />
             </div>
           )}
         </div>
@@ -270,28 +281,38 @@ export function InstructorFormDialog({
             <input style={formStyles.input} type="tel" value={phone2}
               onChange={(e) => setPhone2(e.target.value)} placeholder="09xxxxxxxx" disabled={submitting} />
           </div>
+          <div style={{ ...formStyles.field, flex: 1 }}>
+            <label style={formStyles.label}>鐘點費</label>
+            <input style={formStyles.input} value={hourlyRate}
+              onChange={(e) => setHourlyRate(e.target.value)} placeholder="例：500" disabled={submitting} />
+          </div>
         </div>
+
         <div style={formStyles.field}>
           <label style={formStyles.label}>通訊地址</label>
-          <input style={formStyles.input} value={mailingAddress}
-            onChange={(e) => setMailingAddress(e.target.value)} placeholder="縣市鄉鎮路街號" disabled={submitting} />
+          <div style={row2}>
+            <input style={{ ...formStyles.input, flex: '0 0 120px' }} value={mailingCity}
+              onChange={(e) => setMailingCity(e.target.value)} placeholder="縣市" disabled={submitting} />
+            <input style={{ ...formStyles.input, flex: 1 }} value={mailingAddress}
+              onChange={(e) => setMailingAddress(e.target.value)} placeholder="鄉鎮區路街號" disabled={submitting} />
+          </div>
         </div>
         <div style={formStyles.field}>
           <label style={{ ...formStyles.label, display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <input
-              type="checkbox"
-              checked={registeredSame}
-              onChange={(e) => setRegisteredSame(e.target.checked)}
-              disabled={submitting}
-            />
+            <input type="checkbox" checked={registeredSame}
+              onChange={(e) => setRegisteredSame(e.target.checked)} disabled={submitting} />
             戶籍地址同通訊地址
           </label>
         </div>
         {!registeredSame && (
           <div style={formStyles.field}>
             <label style={formStyles.label}>戶籍地址</label>
-            <input style={formStyles.input} value={registeredAddress}
-              onChange={(e) => setRegisteredAddress(e.target.value)} placeholder="縣市鄉鎮路街號" disabled={submitting} />
+            <div style={row2}>
+              <input style={{ ...formStyles.input, flex: '0 0 120px' }} value={registeredCity}
+                onChange={(e) => setRegisteredCity(e.target.value)} placeholder="縣市" disabled={submitting} />
+              <input style={{ ...formStyles.input, flex: 1 }} value={registeredAddress}
+                onChange={(e) => setRegisteredAddress(e.target.value)} placeholder="鄉鎮區路街號" disabled={submitting} />
+            </div>
           </div>
         )}
 
@@ -313,6 +334,25 @@ export function InstructorFormDialog({
               ))}
             </select>
           </div>
+        </div>
+
+        {/* 其他 */}
+        <div style={sectionTitle}>其他資訊</div>
+        <div style={row2}>
+          <div style={{ ...formStyles.field, flex: 1 }}>
+            <label style={formStyles.label}>累計教學時數</label>
+            <input
+              style={{ ...formStyles.input, background: '#f9fafb' }}
+              value={initial?.totalTeachingHours ?? 0}
+              readOnly
+            />
+            <span style={formStyles.hint}>由系統累計，暫不開放手動修改</span>
+          </div>
+        </div>
+        <div style={formStyles.field}>
+          <label style={formStyles.label}>備註</label>
+          <textarea style={{ ...formStyles.textarea, minHeight: 80 }} value={notes}
+            onChange={(e) => setNotes(e.target.value)} placeholder="備註事項…" disabled={submitting} />
         </div>
 
         {isEdit && (
