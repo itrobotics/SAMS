@@ -16,10 +16,12 @@ import {
   removeStudentFromClass,
   subscribeClassRoster,
 } from '../services/classStudents';
+import { subscribeInstructors } from '../services/instructors';
 import { subscribeStudents } from '../services/students';
 import { canAccessBranch } from '../types/user';
 import { CLASSES_COLLECTION, WEEKDAY_LABELS, type ClassDoc, type ClassMeeting } from '../types/class';
 import type { ClassStudentDoc } from '../types/classStudent';
+import type { InstructorDoc } from '../types/instructor';
 import type { StudentDoc } from '../types/student';
 
 export function ClassDetailPage() {
@@ -29,6 +31,7 @@ export function ClassDetailPage() {
   const [klass, setKlass] = useState<ClassDoc | null | 'missing'>(null);
   const [roster, setRoster] = useState<ClassStudentDoc[]>([]);
   const [allStudents, setAllStudents] = useState<StudentDoc[]>([]);
+  const [instructorMap, setInstructorMap] = useState<Map<string, string>>(new Map());
   const [keyword, setKeyword] = useState('');
   const [candidateBranch, setCandidateBranch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -64,6 +67,13 @@ export function ClassDetailPage() {
     );
     return unsub;
   }, [klass]);
+
+  // 訂閱講師清單以顯示姓名
+  useEffect(() => {
+    return subscribeInstructors({}, (list: InstructorDoc[]) => {
+      setInstructorMap(new Map(list.map((t) => [t.instructorId, t.name])));
+    });
+  }, []);
 
   // 即使 class 未載入也要呼叫 hooks，否則會違反 React 的 hook 順序規則
   const activeRoster = useMemo(() => roster.filter((r) => r.active), [roster]);
@@ -147,8 +157,10 @@ export function ClassDetailPage() {
           <h1 style={styles.title}>{klass.name}</h1>
           <p style={styles.subtitle}>
             <code>{klass.classId}</code> · {branchName}
-            {klass.classroom ? ` · 預設教室 ${klass.classroom}` : ''}
-            {klass.teacherId ? ` · 預設老師 ${klass.teacherId}` : ''}
+            {klass.courseType ? ` · ${klass.courseType}` : ''}
+            {klass.courseStartDate ? ` · ${klass.courseStartDate}` : ''}
+            {klass.courseEndDate ? ` ~ ${klass.courseEndDate}` : ''}
+            {klass.courseHours ? ` · ${klass.courseHours} 時數` : ''}
             {' · '}
             <span style={klass.active ? styles.pillActive : styles.pillInactive}>
               {klass.active ? '啟用' : '停用'}
@@ -157,8 +169,7 @@ export function ClassDetailPage() {
           <ul style={meetingsListStyle}>
             {(klass.meetings ?? []).map((m, idx) => (
               <li key={idx} style={meetingsItemStyle}>
-                <strong>{WEEKDAY_LABELS[m.weekday] ?? `週${m.weekday}`} {m.startTime}–{m.endTime}</strong>
-                {meetingOverrideSuffix(m, klass)}
+                {formatMeetingLabel(m, klass, instructorMap)}
               </li>
             ))}
           </ul>
@@ -253,11 +264,23 @@ export function ClassDetailPage() {
   );
 }
 
-function meetingOverrideSuffix(m: ClassMeeting, klass: ClassDoc): string {
+function formatMeetingLabel(
+  m: ClassMeeting,
+  klass: ClassDoc,
+  instructorMap: Map<string, string>,
+): string {
+  const weekLabel = WEEKDAY_LABELS[m.weekday] ?? `週${m.weekday}`;
+  const time = `${m.startTime}–${m.endTime}`;
+  const teacherId = m.teacherId || klass.teacherId;
+  const classroom = m.classroom || klass.classroom;
   const parts: string[] = [];
-  if (m.classroom && m.classroom !== klass.classroom) parts.push(`教室 ${m.classroom}`);
-  if (m.teacherId && m.teacherId !== klass.teacherId) parts.push(`老師 ${m.teacherId}`);
-  return parts.length === 0 ? '' : `（${parts.join('、')}）`;
+  if (teacherId) {
+    const name = instructorMap.get(teacherId);
+    parts.push(`講師 ${teacherId}${name ? ` ${name}` : ''}`);
+  }
+  if (classroom) parts.push(`教室 ${classroom}`);
+  const suffix = parts.length > 0 ? `（${parts.join(' | ')}）` : '';
+  return `${weekLabel} ${time}${suffix}`;
 }
 
 const meetingsListStyle: React.CSSProperties = {
