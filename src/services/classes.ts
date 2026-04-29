@@ -36,6 +36,7 @@ import {
   sortMeetings,
   validateMeetings,
   type ClassDoc,
+  type ClassMeeting,
   type NewClassInput,
   type UpdateClassInput,
 } from '../types/class';
@@ -113,8 +114,9 @@ export async function createClass(input: NewClassInput): Promise<void> {
 
   // 驗證 + 正規化 meetings
   validateMeetings(input.meetings);
-  const meetings = sortMeetings(input.meetings);
-  const weekdays = deriveWeekdays(meetings);
+  const sorted = sortMeetings(input.meetings);
+  const meetings = sorted.map(stripMeeting);
+  const weekdays = deriveWeekdays(sorted);
 
   const existing = await getDoc(classRef(classId));
   if (existing.exists()) throw new Error(`班級代碼「${classId}」已存在`);
@@ -139,8 +141,9 @@ export async function updateClass(classId: string, patch: UpdateClassInput): Pro
   if (patch.classroom !== undefined) cleaned.classroom = patch.classroom.trim();
   if (patch.meetings !== undefined) {
     validateMeetings(patch.meetings);
-    cleaned.meetings = sortMeetings(patch.meetings);
-    cleaned.weekdays = deriveWeekdays(patch.meetings);
+    const sorted = sortMeetings(patch.meetings);
+    cleaned.meetings = sorted.map(stripMeeting);
+    cleaned.weekdays = deriveWeekdays(sorted);
   }
   if (patch.active !== undefined) cleaned.active = patch.active;
   if (Object.keys(cleaned).length === 0) return;
@@ -149,4 +152,16 @@ export async function updateClass(classId: string, patch: UpdateClassInput): Pro
 
 export async function setClassActive(classId: string, active: boolean): Promise<void> {
   await updateDoc(classRef(classId), { active });
+}
+
+// Firestore 不允許 undefined 欄位，把選填的 override 欄位清除後再寫入。
+function stripMeeting(m: ClassMeeting): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    weekday: m.weekday,
+    startTime: m.startTime,
+    endTime: m.endTime,
+  };
+  if (m.classroom !== undefined && m.classroom !== '') out.classroom = m.classroom;
+  if (m.teacherId !== undefined && m.teacherId !== '') out.teacherId = m.teacherId;
+  return out;
 }
