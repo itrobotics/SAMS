@@ -23,6 +23,7 @@ export interface InstructorDoc {
   instructorId: string;
   name: string;
   gender: Gender;
+  birthday: string;        // "YYYY-MM-DD" or ""
   courses: string[];
   education: string;
   schoolStatus: SchoolStatus;
@@ -32,9 +33,11 @@ export interface InstructorDoc {
   phone1: string;
   phone2: string;
   mailingCity: string;
+  mailingDistrict: string;
   mailingAddress: string;
   registeredAddressSameAsMailing: boolean;
   registeredCity: string;
+  registeredDistrict: string;
   registeredAddress: string;
   emergencyContactName: string;
   emergencyContactRelation: string;

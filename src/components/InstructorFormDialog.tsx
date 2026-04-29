@@ -1,9 +1,10 @@
-// 講師新增 / 編輯表單（Task 046, updated Task 050）
+// 講師新增 / 編輯表單（Task 046, updated Task 057）
 
 import { useEffect, useState, type FormEvent } from 'react';
 
 import { Modal } from './Modal';
 import { formStyles } from './formStyles';
+import { TaiwanAddressFields, type AddressValue } from './TaiwanAddressFields';
 import { subscribeOptions } from '../services/appOptions';
 import { createInstructor, updateInstructor } from '../services/instructors';
 import { OPTION_KEYS } from '../types/appOptions';
@@ -26,6 +27,7 @@ interface InstructorFormDialogProps {
 
 const SCHOOL_STATUSES: SchoolStatus[] = ['graduated', 'dropped', 'enrolled'];
 const GENDERS: Gender[] = ['male', 'female', 'other'];
+const EMPTY_ADDR: AddressValue = { city: '', district: '', address: '' };
 
 export function InstructorFormDialog({
   open,
@@ -41,22 +43,21 @@ export function InstructorFormDialog({
   const [instructorId, setInstructorId] = useState('');
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender>('male');
+  const [birthday, setBirthday] = useState('');
   const [courses, setCourses] = useState<string[]>([]);
   const [education, setEducation] = useState('');
   const [schoolStatus, setSchoolStatus] = useState<SchoolStatus>('graduated');
   const [schoolName, setSchoolName] = useState('');
   const [department, setDepartment] = useState('');
-  const [grade, setGrade] = useState('');
+  const [schoolGrade, setSchoolGrade] = useState('');
   const [phone1, setPhone1] = useState('');
   const [phone2, setPhone2] = useState('');
-  const [mailingCity, setMailingCity] = useState('');
-  const [mailingAddress, setMailingAddress] = useState('');
+  const [hourlyRate, setHourlyRate] = useState('');
+  const [mailingAddr, setMailingAddr] = useState<AddressValue>(EMPTY_ADDR);
   const [registeredSame, setRegisteredSame] = useState(true);
-  const [registeredCity, setRegisteredCity] = useState('');
-  const [registeredAddress, setRegisteredAddress] = useState('');
+  const [registeredAddr, setRegisteredAddr] = useState<AddressValue>(EMPTY_ADDR);
   const [ecName, setEcName] = useState('');
   const [ecRelation, setEcRelation] = useState('');
-  const [hourlyRate, setHourlyRate] = useState('');
   const [notes, setNotes] = useState('');
   const [active, setActive] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -77,22 +78,29 @@ export function InstructorFormDialog({
     }
     setName(initial?.name ?? '');
     setGender(initial?.gender ?? 'male');
+    setBirthday(initial?.birthday ?? '');
     setCourses(initial?.courses ?? []);
     setEducation(initial?.education ?? '');
     setSchoolStatus(initial?.schoolStatus ?? 'graduated');
     setSchoolName(initial?.schoolName ?? '');
     setDepartment(initial?.department ?? '');
-    setGrade(initial?.grade ?? '');
+    setSchoolGrade(initial?.grade ?? '');
     setPhone1(initial?.phone1 ?? '');
     setPhone2(initial?.phone2 ?? '');
-    setMailingCity(initial?.mailingCity ?? '');
-    setMailingAddress(initial?.mailingAddress ?? '');
+    setHourlyRate(initial?.hourlyRate ?? '');
+    setMailingAddr({
+      city: initial?.mailingCity ?? '',
+      district: initial?.mailingDistrict ?? '',
+      address: initial?.mailingAddress ?? '',
+    });
     setRegisteredSame(initial?.registeredAddressSameAsMailing ?? true);
-    setRegisteredCity(initial?.registeredCity ?? '');
-    setRegisteredAddress(initial?.registeredAddress ?? '');
+    setRegisteredAddr({
+      city: initial?.registeredCity ?? '',
+      district: initial?.registeredDistrict ?? '',
+      address: initial?.registeredAddress ?? '',
+    });
     setEcName(initial?.emergencyContactName ?? '');
     setEcRelation(initial?.emergencyContactRelation ?? '');
-    setHourlyRate(initial?.hourlyRate ?? '');
     setNotes(initial?.notes ?? '');
     setActive(initial?.active ?? true);
     setError(null);
@@ -113,23 +121,27 @@ export function InstructorFormDialog({
     setSubmitting(true);
     setError(null);
     try {
+      const regAddr = registeredSame ? mailingAddr : registeredAddr;
       const payload = {
         instructorId: instructorId.trim(),
         name: name.trim(),
         gender,
+        birthday,
         courses,
         education,
         schoolStatus,
         schoolName,
         department,
-        grade: schoolStatus === 'enrolled' ? grade : '',
+        grade: schoolStatus === 'enrolled' ? schoolGrade : '',
         phone1,
         phone2,
-        mailingCity,
-        mailingAddress,
+        mailingCity: mailingAddr.city,
+        mailingDistrict: mailingAddr.district,
+        mailingAddress: mailingAddr.address,
         registeredAddressSameAsMailing: registeredSame,
-        registeredCity: registeredSame ? '' : registeredCity,
-        registeredAddress: registeredSame ? '' : registeredAddress,
+        registeredCity: regAddr.city,
+        registeredDistrict: regAddr.district,
+        registeredAddress: regAddr.address,
         emergencyContactName: ecName,
         emergencyContactRelation: ecRelation,
         hourlyRate,
@@ -153,56 +165,43 @@ export function InstructorFormDialog({
   }
 
   return (
-    <Modal open={open} title={isEdit ? '編輯講師' : '新增講師'} onClose={onClose} width={620}>
+    <Modal open={open} title={isEdit ? '編輯講師' : '新增講師'} onClose={onClose} width={640}>
       <form onSubmit={handleSubmit}>
         {error && <div style={formStyles.error}>{error}</div>}
 
         {/* 基本資料 */}
         <div style={row2}>
           <div style={{ ...formStyles.field, flex: 1 }}>
-            <label style={formStyles.label}>
-              講師編號<span style={formStyles.required}>*</span>
-            </label>
-            <input
-              style={{ ...formStyles.input, background: '#f9fafb' }}
-              value={instructorId}
-              readOnly
-              placeholder="載入中…"
-              disabled={submitting}
-              required
-            />
+            <label style={formStyles.label}>講師編號<span style={formStyles.required}>*</span></label>
+            <input style={{ ...formStyles.input, background: '#f9fafb' }} value={instructorId}
+              readOnly placeholder="載入中…" disabled={submitting} required />
             {!isEdit && <span style={formStyles.hint}>系統自動帶入，建立後不可修改。</span>}
           </div>
           <div style={{ ...formStyles.field, flex: 2 }}>
-            <label style={formStyles.label}>
-              姓名<span style={formStyles.required}>*</span>
-            </label>
-            <input
-              style={formStyles.input}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="例：陳老師"
-              disabled={submitting}
-              required
-            />
+            <label style={formStyles.label}>姓名<span style={formStyles.required}>*</span></label>
+            <input style={formStyles.input} value={name}
+              onChange={(e) => setName(e.target.value)} placeholder="例：陳老師"
+              disabled={submitting} required />
           </div>
+        </div>
+
+        <div style={row2}>
           <div style={{ ...formStyles.field, flex: 1 }}>
             <label style={formStyles.label}>性別</label>
             <div style={{ display: 'flex', gap: '0.75rem', paddingTop: 6 }}>
               {GENDERS.map((g) => (
                 <label key={g} style={checkboxLabel}>
-                  <input
-                    type="radio"
-                    name="gender"
-                    value={g}
-                    checked={gender === g}
-                    onChange={() => setGender(g)}
-                    disabled={submitting}
-                  />
+                  <input type="radio" name="gender" value={g}
+                    checked={gender === g} onChange={() => setGender(g)} disabled={submitting} />
                   {GENDER_LABELS[g]}
                 </label>
               ))}
             </div>
+          </div>
+          <div style={{ ...formStyles.field, flex: 1 }}>
+            <label style={formStyles.label}>生日</label>
+            <input type="date" style={formStyles.input} value={birthday}
+              onChange={(e) => setBirthday(e.target.value)} disabled={submitting} />
           </div>
         </div>
 
@@ -215,12 +214,8 @@ export function InstructorFormDialog({
             )}
             {courseOptions.map((c) => (
               <label key={c} style={checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={courses.includes(c)}
-                  onChange={() => toggleCourse(c)}
-                  disabled={submitting}
-                />
+                <input type="checkbox" checked={courses.includes(c)}
+                  onChange={() => toggleCourse(c)} disabled={submitting} />
                 {c}
               </label>
             ))}
@@ -262,8 +257,8 @@ export function InstructorFormDialog({
           {schoolStatus === 'enrolled' && (
             <div style={{ ...formStyles.field, flex: 1 }}>
               <label style={formStyles.label}>年級</label>
-              <input style={formStyles.input} value={grade}
-                onChange={(e) => setGrade(e.target.value)} placeholder="例：大三" disabled={submitting} />
+              <input style={formStyles.input} value={schoolGrade}
+                onChange={(e) => setSchoolGrade(e.target.value)} placeholder="例：大三" disabled={submitting} />
             </div>
           )}
         </div>
@@ -273,12 +268,12 @@ export function InstructorFormDialog({
         <div style={row2}>
           <div style={{ ...formStyles.field, flex: 1 }}>
             <label style={formStyles.label}>聯絡電話1</label>
-            <input style={formStyles.input} type="tel" value={phone1}
+            <input type="tel" style={formStyles.input} value={phone1}
               onChange={(e) => setPhone1(e.target.value)} placeholder="09xxxxxxxx" disabled={submitting} />
           </div>
           <div style={{ ...formStyles.field, flex: 1 }}>
             <label style={formStyles.label}>聯絡電話2</label>
-            <input style={formStyles.input} type="tel" value={phone2}
+            <input type="tel" style={formStyles.input} value={phone2}
               onChange={(e) => setPhone2(e.target.value)} placeholder="09xxxxxxxx" disabled={submitting} />
           </div>
           <div style={{ ...formStyles.field, flex: 1 }}>
@@ -288,33 +283,29 @@ export function InstructorFormDialog({
           </div>
         </div>
 
+        {/* 通訊地址 */}
         <div style={formStyles.field}>
           <label style={formStyles.label}>通訊地址</label>
-          <div style={row2}>
-            <input style={{ ...formStyles.input, flex: '0 0 120px' }} value={mailingCity}
-              onChange={(e) => setMailingCity(e.target.value)} placeholder="縣市" disabled={submitting} />
-            <input style={{ ...formStyles.input, flex: 1 }} value={mailingAddress}
-              onChange={(e) => setMailingAddress(e.target.value)} placeholder="鄉鎮區路街號" disabled={submitting} />
-          </div>
+          <TaiwanAddressFields value={mailingAddr} onChange={setMailingAddr} disabled={submitting} />
         </div>
+
+        {/* 戶籍地址 */}
         <div style={formStyles.field}>
-          <label style={{ ...formStyles.label, display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <label style={formStyles.label}>戶籍地址</label>
+          <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
             <input type="checkbox" checked={registeredSame}
               onChange={(e) => setRegisteredSame(e.target.checked)} disabled={submitting} />
-            戶籍地址同通訊地址
+            同通訊地址
           </label>
+          {!registeredSame && (
+            <TaiwanAddressFields value={registeredAddr} onChange={setRegisteredAddr} disabled={submitting} />
+          )}
+          {registeredSame && (
+            <span style={formStyles.hint}>
+              {mailingAddr.city}{mailingAddr.district}{mailingAddr.address || '（尚未填寫通訊地址）'}
+            </span>
+          )}
         </div>
-        {!registeredSame && (
-          <div style={formStyles.field}>
-            <label style={formStyles.label}>戶籍地址</label>
-            <div style={row2}>
-              <input style={{ ...formStyles.input, flex: '0 0 120px' }} value={registeredCity}
-                onChange={(e) => setRegisteredCity(e.target.value)} placeholder="縣市" disabled={submitting} />
-              <input style={{ ...formStyles.input, flex: 1 }} value={registeredAddress}
-                onChange={(e) => setRegisteredAddress(e.target.value)} placeholder="鄉鎮區路街號" disabled={submitting} />
-            </div>
-          </div>
-        )}
 
         {/* 緊急聯絡人 */}
         <div style={sectionTitle}>緊急聯絡人</div>
@@ -341,18 +332,16 @@ export function InstructorFormDialog({
         <div style={row2}>
           <div style={{ ...formStyles.field, flex: 1 }}>
             <label style={formStyles.label}>累計教學時數</label>
-            <input
-              style={{ ...formStyles.input, background: '#f9fafb' }}
-              value={initial?.totalTeachingHours ?? 0}
-              readOnly
-            />
+            <input style={{ ...formStyles.input, background: '#f9fafb' }}
+              value={initial?.totalTeachingHours ?? 0} readOnly />
             <span style={formStyles.hint}>由系統累計，暫不開放手動修改</span>
           </div>
         </div>
         <div style={formStyles.field}>
           <label style={formStyles.label}>備註</label>
-          <textarea style={{ ...formStyles.textarea, minHeight: 80 }} value={notes}
-            onChange={(e) => setNotes(e.target.value)} placeholder="備註事項…" disabled={submitting} />
+          <textarea style={{ ...formStyles.input, height: 80, resize: 'vertical' } as React.CSSProperties}
+            value={notes} onChange={(e) => setNotes(e.target.value)}
+            placeholder="備註事項…" disabled={submitting} />
         </div>
 
         {isEdit && (
