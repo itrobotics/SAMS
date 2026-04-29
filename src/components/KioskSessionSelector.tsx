@@ -85,7 +85,7 @@ export function KioskSessionSelector({
                   <div style={styles.rowMeta}>
                     {s.startTime}–{s.endTime}
                     {s.classroom ? ` · 教室 ${s.classroom}` : ''}
-                    {s.teacherId ? ` · 老師 ${s.teacherId}` : ''}
+                    {s.teacherId ? ` · 講師 ${s.teacherId}` : ''}
                   </div>
                 </div>
                 {active && <span style={styles.activeBadge}>進行中</span>}

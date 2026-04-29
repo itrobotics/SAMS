@@ -372,7 +372,7 @@ function Stage({
         <div style={{ ...styles.center, background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)' }}>
           <div style={styles.failIcon}>✕</div>
           <h1 style={styles.failTitle}>辨識失敗</h1>
-          <p style={styles.failMsg}>無法辨識，請老師協助</p>
+          <p style={styles.failMsg}>無法辨識，請講師協助</p>
           <button
             type="button"
             onClick={onSwitchToManual}
@@ -382,7 +382,7 @@ function Stage({
               borderRadius: 8, fontSize: '1.05rem', fontWeight: 600,
             }}
           >
-            老師手動報到
+            講師手動報到
           </button>
         </div>
       );
@@ -423,7 +423,7 @@ function ManualFallback({
   return (
     <div style={styles.center}>
       <div style={{ ...styles.confirmCard, width: 'min(640px, 90vw)' }}>
-        <h2 style={{ margin: 0, fontSize: '1.5rem', textAlign: 'left' }}>老師手動報到</h2>
+        <h2 style={{ margin: 0, fontSize: '1.5rem', textAlign: 'left' }}>講師手動報到</h2>
         <p style={{ color: '#cbd5e1', fontSize: '0.9rem', textAlign: 'left', marginTop: '0.4rem' }}>
           搜尋目前比對範圍內、尚未報到的學生
         </p>

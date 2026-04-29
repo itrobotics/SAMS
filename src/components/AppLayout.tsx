@@ -81,7 +81,7 @@ function roleLabel(role: string): string {
     case 'branch_admin':
       return '分校管理員';
     case 'teacher':
-      return '老師';
+      return '講師';
     case 'staff':
       return '行政';
     default:

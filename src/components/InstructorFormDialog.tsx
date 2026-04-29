@@ -180,7 +180,7 @@ export function InstructorFormDialog({
           <div style={{ ...formStyles.field, flex: 2 }}>
             <label style={formStyles.label}>姓名<span style={formStyles.required}>*</span></label>
             <input style={formStyles.input} value={name}
-              onChange={(e) => setName(e.target.value)} placeholder="例：陳老師"
+              onChange={(e) => setName(e.target.value)} placeholder="例：陳講師"
               disabled={submitting} required />
           </div>
         </div>

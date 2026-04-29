@@ -118,7 +118,7 @@ export function SessionPage() {
           <p style={styles.subtitle}>
             {session.date} · {session.startTime}–{session.endTime}
             {session.classroom ? ` · 教室 ${session.classroom}` : ''}
-            {session.teacherId ? ` · 老師 ${session.teacherId}` : ''}
+            {session.teacherId ? ` · 講師 ${session.teacherId}` : ''}
             {' · '}<code>{session.sessionId}</code>
           </p>
           <p style={styles.graceNote}>
