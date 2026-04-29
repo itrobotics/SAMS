@@ -12,67 +12,13 @@ import { fetchAllActiveClassStudentCounts } from '../services/classStudents';
 import { subscribeInstructors } from '../services/instructors';
 import { WEEKDAY_LABELS, formatMeetingsLabel, type ClassDoc } from '../types/class';
 import type { InstructorDoc } from '../types/instructor';
+import {
+  COURSE_PERIOD_OPTIONS,
+  matchesCoursePeriod,
+  type CoursePeriodPreset,
+} from '../utils/coursePeriodFilter';
 
 const ALL = '__all__';
-
-// ── 期間 filter ──────────────────────────────────────────────
-type PeriodPreset = 'all' | 'today' | 'week' | 'month' | 'lastMonth' | 'nextMonth' | 'custom';
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function getPresetRange(preset: PeriodPreset): { from: string; to: string } | null {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth(); // 0-based
-  const d = now.getDate();
-
-  if (preset === 'today') {
-    const s = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    return { from: s, to: s };
-  }
-  if (preset === 'week') {
-    const dow = (now.getDay() + 6) % 7; // Mon=0
-    const mon = new Date(now); mon.setDate(d - dow);
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-    return { from: mon.toISOString().slice(0, 10), to: sun.toISOString().slice(0, 10) };
-  }
-  if (preset === 'month') {
-    const from = `${y}-${String(m + 1).padStart(2, '0')}-01`;
-    const last = new Date(y, m + 1, 0).getDate();
-    const to = `${y}-${String(m + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
-    return { from, to };
-  }
-  if (preset === 'lastMonth') {
-    const lm = m === 0 ? 11 : m - 1;
-    const ly = m === 0 ? y - 1 : y;
-    const last = new Date(ly, lm + 1, 0).getDate();
-    const from = `${ly}-${String(lm + 1).padStart(2, '0')}-01`;
-    const to = `${ly}-${String(lm + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
-    return { from, to };
-  }
-  if (preset === 'nextMonth') {
-    const nm = m === 11 ? 0 : m + 1;
-    const ny = m === 11 ? y + 1 : y;
-    const last = new Date(ny, nm + 1, 0).getDate();
-    const from = `${ny}-${String(nm + 1).padStart(2, '0')}-01`;
-    const to = `${ny}-${String(nm + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
-    return { from, to };
-  }
-  return null;
-}
-
-// 班級的課程期間與 filter 期間是否重疊（端點相等視為重疊）
-function overlapsPeriod(c: ClassDoc, from: string, to: string): boolean {
-  const s = c.courseStartDate;
-  const e = c.courseEndDate;
-  if (!s && !e) return true; // 未設起訖視為永遠有效
-  if (s && e) return s <= to && e >= from;
-  if (s && !e) return s <= to;    // 只有開始
-  if (!s && e) return e >= from;  // 只有結束
-  return true;
-}
 
 export function ClassesPage() {
   const { user } = useAuth();
@@ -91,9 +37,7 @@ export function ClassesPage() {
   const [filterWeekday, setFilterWeekday] = useState<number | typeof ALL>(ALL);
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'disabled'>('active');
   const [filterTeacher, setFilterTeacher] = useState('');
-  const [filterPeriod, setFilterPeriod] = useState<PeriodPreset>('all');
-  const [filterFrom, setFilterFrom] = useState(todayStr());
-  const [filterTo, setFilterTo] = useState(todayStr());
+  const [filterPeriod, setFilterPeriod] = useState<CoursePeriodPreset>('all');
 
   function openCreate() { setEditing(null); setDialogOpen(true); }
   function openEdit(c: ClassDoc) { setEditing(c); setDialogOpen(true); }
@@ -156,13 +100,6 @@ export function ClassesPage() {
 
   const visible = useMemo(() => {
     const kw = filterTeacher.trim().toLowerCase();
-    const presetRange = filterPeriod !== 'custom' && filterPeriod !== 'all'
-      ? getPresetRange(filterPeriod) : null;
-    const rangeFrom = filterPeriod === 'custom' ? filterFrom
-      : presetRange ? presetRange.from : '';
-    const rangeTo = filterPeriod === 'custom' ? filterTo
-      : presetRange ? presetRange.to : '';
-
     return classes.filter((c) => {
       if (filterBranch !== ALL && c.branchId !== filterBranch) return false;
       if (filterWeekday !== ALL && !(c.weekdays ?? []).includes(filterWeekday)) return false;
@@ -176,12 +113,12 @@ export function ClassesPage() {
         }).join(' ');
         if (!haystack.includes(kw)) return false;
       }
-      if (filterPeriod !== 'all' && rangeFrom && rangeTo) {
-        if (!overlapsPeriod(c, rangeFrom, rangeTo)) return false;
+      if (!matchesCoursePeriod(filterPeriod, c.courseStartDate, c.courseEndDate)) {
+        return false;
       }
       return true;
     });
-  }, [classes, filterBranch, filterWeekday, filterActive, filterTeacher, filterPeriod, filterFrom, filterTo, instructorMap]);
+  }, [classes, filterBranch, filterWeekday, filterActive, filterTeacher, filterPeriod, instructorMap]);
 
   const branchName = (id: string) => branches.find((b) => b.branchId === id)?.name ?? id;
 
@@ -232,26 +169,13 @@ export function ClassesPage() {
         />
         <select
           value={filterPeriod}
-          onChange={(e) => setFilterPeriod(e.target.value as PeriodPreset)}
+          onChange={(e) => setFilterPeriod(e.target.value as CoursePeriodPreset)}
           style={styles.input}
         >
-          <option value="all">全部期間</option>
-          <option value="today">今日</option>
-          <option value="week">本週</option>
-          <option value="month">本月</option>
-          <option value="lastMonth">上月</option>
-          <option value="nextMonth">下月</option>
-          <option value="custom">自訂期間</option>
+          {COURSE_PERIOD_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
         </select>
-        {filterPeriod === 'custom' && (
-          <>
-            <input type="date" value={filterFrom}
-              onChange={(e) => setFilterFrom(e.target.value)} style={styles.input} />
-            <span style={{ alignSelf: 'center', color: '#6b7280' }}>~</span>
-            <input type="date" value={filterTo}
-              onChange={(e) => setFilterTo(e.target.value)} style={styles.input} />
-          </>
-        )}
       </div>
 
       {error && <div style={styles.error}>{error}</div>}

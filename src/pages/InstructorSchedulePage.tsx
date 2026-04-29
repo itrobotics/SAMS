@@ -11,59 +11,13 @@ import { subscribeClasses } from '../services/classes';
 import { subscribeInstructors } from '../services/instructors';
 import { WEEKDAY_LABELS, type ClassDoc } from '../types/class';
 import type { InstructorDoc } from '../types/instructor';
+import {
+  COURSE_PERIOD_OPTIONS,
+  matchesCoursePeriod,
+  type CoursePeriodPreset,
+} from '../utils/coursePeriodFilter';
 
 const ALL = '__all__';
-
-type PeriodPreset = 'all' | 'today' | 'week' | 'month' | 'lastMonth' | 'nextMonth' | 'custom';
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function getPresetRange(preset: PeriodPreset): { from: string; to: string } | null {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const d = now.getDate();
-  if (preset === 'today') {
-    const s = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    return { from: s, to: s };
-  }
-  if (preset === 'week') {
-    const dow = (now.getDay() + 6) % 7;
-    const mon = new Date(now); mon.setDate(d - dow);
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-    return { from: mon.toISOString().slice(0, 10), to: sun.toISOString().slice(0, 10) };
-  }
-  if (preset === 'month') {
-    const from = `${y}-${String(m + 1).padStart(2, '0')}-01`;
-    const last = new Date(y, m + 1, 0).getDate();
-    return { from, to: `${y}-${String(m + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}` };
-  }
-  if (preset === 'lastMonth') {
-    const lm = m === 0 ? 11 : m - 1;
-    const ly = m === 0 ? y - 1 : y;
-    const last = new Date(ly, lm + 1, 0).getDate();
-    return { from: `${ly}-${String(lm + 1).padStart(2, '0')}-01`, to: `${ly}-${String(lm + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}` };
-  }
-  if (preset === 'nextMonth') {
-    const nm = m === 11 ? 0 : m + 1;
-    const ny = m === 11 ? y + 1 : y;
-    const last = new Date(ny, nm + 1, 0).getDate();
-    return { from: `${ny}-${String(nm + 1).padStart(2, '0')}-01`, to: `${ny}-${String(nm + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}` };
-  }
-  return null;
-}
-
-function overlapsPeriod(c: ClassDoc, from: string, to: string): boolean {
-  const s = c.courseStartDate;
-  const e = c.courseEndDate;
-  if (!s && !e) return true;
-  if (s && e) return s <= to && e >= from;
-  if (s && !e) return s <= to;
-  if (!s && e) return e >= from;
-  return true;
-}
 
 // 取得某講師在班級中負責的時段說明
 function instructorMeetings(c: ClassDoc, tid: string): string {
@@ -88,9 +42,7 @@ export function InstructorSchedulePage() {
 
   const [filterInstructor, setFilterInstructor] = useState<string>(ALL);
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'disabled'>('active');
-  const [filterPeriod, setFilterPeriod] = useState<PeriodPreset>('all');
-  const [filterFrom, setFilterFrom] = useState(todayStr());
-  const [filterTo, setFilterTo] = useState(todayStr());
+  const [filterPeriod, setFilterPeriod] = useState<CoursePeriodPreset>('all');
 
   useEffect(() => {
     return subscribeInstructors({}, setInstructors);
@@ -114,19 +66,12 @@ export function InstructorSchedulePage() {
   );
 
   const rows = useMemo(() => {
-    const presetRange = filterPeriod !== 'custom' && filterPeriod !== 'all'
-      ? getPresetRange(filterPeriod) : null;
-    const rangeFrom = filterPeriod === 'custom' ? filterFrom : presetRange?.from ?? '';
-    const rangeTo = filterPeriod === 'custom' ? filterTo : presetRange?.to ?? '';
-
     const result: Array<{ classDoc: ClassDoc; instructorId: string }> = [];
 
     for (const c of classes) {
       if (filterActive === 'active' && !c.active) continue;
       if (filterActive === 'disabled' && c.active) continue;
-      if (filterPeriod !== 'all' && rangeFrom && rangeTo) {
-        if (!overlapsPeriod(c, rangeFrom, rangeTo)) continue;
-      }
+      if (!matchesCoursePeriod(filterPeriod, c.courseStartDate, c.courseEndDate)) continue;
 
       // 收集此班所有有效講師（先 deduplicate per instructor per class）
       const seen = new Set<string>();
@@ -153,7 +98,7 @@ export function InstructorSchedulePage() {
       if (bd !== 0) return bd;
       return a.classDoc.name.localeCompare(b.classDoc.name);
     });
-  }, [classes, filterInstructor, filterActive, filterPeriod, filterFrom, filterTo]);
+  }, [classes, filterInstructor, filterActive, filterPeriod]);
 
   const branchName = (id: string) => branches.find((b) => b.branchId === id)?.name ?? id;
 
@@ -184,24 +129,11 @@ export function InstructorSchedulePage() {
           <option value="all">全部狀態</option>
         </select>
         <select value={filterPeriod}
-          onChange={(e) => setFilterPeriod(e.target.value as PeriodPreset)} style={styles.input}>
-          <option value="all">全部期間</option>
-          <option value="today">今日</option>
-          <option value="week">本週</option>
-          <option value="month">本月</option>
-          <option value="lastMonth">上月</option>
-          <option value="nextMonth">下月</option>
-          <option value="custom">自訂期間</option>
+          onChange={(e) => setFilterPeriod(e.target.value as CoursePeriodPreset)} style={styles.input}>
+          {COURSE_PERIOD_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
         </select>
-        {filterPeriod === 'custom' && (
-          <>
-            <input type="date" value={filterFrom}
-              onChange={(e) => setFilterFrom(e.target.value)} style={styles.input} />
-            <span style={{ alignSelf: 'center', color: '#6b7280' }}>~</span>
-            <input type="date" value={filterTo}
-              onChange={(e) => setFilterTo(e.target.value)} style={styles.input} />
-          </>
-        )}
       </div>
 
       <div style={styles.tableWrap}>
