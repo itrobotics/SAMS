@@ -10,6 +10,9 @@ import { StudentsPage } from '../pages/StudentsPage';
 import { StudentDetailPage } from '../pages/StudentDetailPage';
 import { ClassesPage } from '../pages/ClassesPage';
 import { ClassDetailPage } from '../pages/ClassDetailPage';
+import { CoursesPage } from '../pages/CoursesPage';
+import { CourseDetailPage } from '../pages/CourseDetailPage';
+import { CourseSessionPage } from '../pages/CourseSessionPage';
 import { InstructorsPage } from '../pages/InstructorsPage';
 import { InstructorSchedulePage } from '../pages/InstructorSchedulePage';
 import { SettingsPage } from '../pages/SettingsPage';
@@ -95,6 +98,30 @@ export function AppRouter() {
           element={
             <AuthGuard>
               <ClassDetailPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.courses}
+          element={
+            <AuthGuard>
+              <CoursesPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.courseDetail()}
+          element={
+            <AuthGuard>
+              <CourseDetailPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.courseSession()}
+          element={
+            <AuthGuard>
+              <CourseSessionPage />
             </AuthGuard>
           }
         />
