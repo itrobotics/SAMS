@@ -5,7 +5,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Modal } from './Modal';
 import { formStyles } from './formStyles';
 import { useBranches } from '../hooks/useBranches';
-import { createStudent, updateStudent } from '../services/students';
+import { createStudent, deleteStudent, updateStudent } from '../services/students';
 import { STUDENTS_COLLECTION, isValidStudentId, type StudentDoc } from '../types/student';
 import { getNextId } from '../utils/autoId';
 
@@ -204,13 +204,38 @@ export function StudentFormDialog({
           </div>
         )}
 
-        <div style={formStyles.actions}>
-          <button type="button" style={formStyles.btnSecondary} onClick={onClose} disabled={submitting}>
-            取消
-          </button>
-          <button type="submit" style={formStyles.btnPrimary} disabled={submitting}>
-            {submitting ? '儲存中…' : '儲存'}
-          </button>
+        <div style={{ ...formStyles.actions, justifyContent: 'space-between' }}>
+          <div>
+            {isEdit && initial && (
+              <button
+                type="button"
+                style={formStyles.btnDanger}
+                disabled={submitting}
+                onClick={async () => {
+                  if (!window.confirm(`確定要永久刪除學生「${initial.name}」？\n\n此操作無法復原，歷史出席紀錄仍會保留。`)) return;
+                  setSubmitting(true);
+                  try {
+                    await deleteStudent(initial.studentId);
+                    onSaved();
+                    onClose();
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : '刪除失敗');
+                    setSubmitting(false);
+                  }
+                }}
+              >
+                刪除學生
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button type="button" style={formStyles.btnSecondary} onClick={onClose} disabled={submitting}>
+              取消
+            </button>
+            <button type="submit" style={formStyles.btnPrimary} disabled={submitting}>
+              {submitting ? '儲存中…' : '儲存'}
+            </button>
+          </div>
         </div>
       </form>
     </Modal>

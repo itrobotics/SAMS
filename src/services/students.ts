@@ -2,6 +2,7 @@
 
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   onSnapshot,
@@ -103,4 +104,8 @@ export async function updateStudent(studentId: string, patch: UpdateStudentInput
 
 export async function setStudentActive(studentId: string, active: boolean): Promise<void> {
   await updateDoc(studentRef(studentId), { active });
+}
+
+export async function deleteStudent(studentId: string): Promise<void> {
+  await deleteDoc(studentRef(studentId));
 }
