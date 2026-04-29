@@ -11,6 +11,7 @@ export const ROUTES = {
   studentDetail: (studentId = ':studentId') => `/students/${studentId}`,
   classes: '/classes',
   classDetail: (classId = ':classId') => `/classes/${classId}`,
+  classPricing: '/class-pricing',
   instructors: '/instructors',
   instructorSchedule: '/instructor-schedule',
   settings: '/settings',
