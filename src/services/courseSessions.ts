@@ -1,6 +1,14 @@
 // course_sessions CRUD + subscribe
 //
-// 場次由人工建立，建立時依 enrollments 同步寫入 course_attendance（status=ABSENT）。
+// 場次的兩種建立方式：
+//   1) openCourseSessionFromSlot — 從某 module 的某 slot「開啟」一個場次（主要入口）
+//      自動產生 courseSessionId（CS000001）、寫入 course_sessions + course_attendance
+//      idempotent：同一 (courseId, moduleId, date, startTime) 已開啟過會直接拋錯
+//   2) createCourseSession — 直接給定完整 input 的低階介面（保留給雜項場次或未來擴充）
+//
+// 任一種都會：
+//   - 寫入 course_sessions 文件
+//   - 為當下 active 學員批次建 course_attendance（status='SCHEDULED'）
 // 刪除時連同 course_attendance 一起清除。
 
 import {
@@ -15,6 +23,7 @@ import {
   where,
   writeBatch,
   type Unsubscribe,
+  type WriteBatch,
 } from 'firebase/firestore';
 
 import { db } from './firebase';
@@ -33,6 +42,8 @@ import {
   courseAttendanceDocId,
   type CourseAttendanceDoc,
 } from '../types/courseAttendance';
+import type { CourseModuleDoc, CourseModuleSlot } from '../types/courseModule';
+import { getNextId } from '../utils/autoId';
 
 function csRef(courseSessionId: string) {
   return doc(db, COURSE_SESSIONS_COLLECTION, courseSessionId);
@@ -72,7 +83,62 @@ export function subscribeCourseSessions(
   );
 }
 
-// 建立場次：同時根據 active enrollments 建立 course_attendance（status=ABSENT）
+// 從某 module 的某 slot 開啟場次（主要入口）
+//   1) 找 module 上指定 slot（依 date + startTime 比對）
+//   2) 檢查是否已開啟過（同 courseId + moduleId + date + startTime）
+//   3) 產生 courseSessionId（CS000001）、寫場次 + 物化出席名單
+export async function openCourseSessionFromSlot(
+  module: CourseModuleDoc,
+  slot: CourseModuleSlot,
+): Promise<string> {
+  if (!module.courseId) throw new Error('缺少課程代碼');
+  if (!slot.date || !slot.startTime || !slot.endTime) throw new Error('時段資料不完整');
+
+  // idempotent guard
+  const existing = await findExistingSlotSession(module.courseId, module.moduleId, slot);
+  if (existing) {
+    throw new Error(`此時段已開啟（${existing.courseSessionId}）`);
+  }
+
+  const courseSessionId = await getNextId('CS', COURSE_SESSIONS_COLLECTION, 6);
+  await setDoc(csRef(courseSessionId), {
+    courseId: module.courseId,
+    moduleId: module.moduleId,
+    branchId: module.branchId,
+    date: slot.date,
+    startTime: slot.startTime,
+    endTime: slot.endTime,
+    hours: Number(slot.hours) || 0,
+    // 講師 / 教室從 module 帶過來（snapshot — 之後若 module 改動不會影響已開啟場次）
+    instructorId: module.instructorId ?? '',
+    classroom: module.classroom ?? '',
+    status: 'scheduled',
+    notes: '',
+  });
+
+  await materializeAttendance(courseSessionId, module.courseId, module.moduleId, module.branchId);
+  return courseSessionId;
+}
+
+// 找出某 (courseId, moduleId, date, startTime) 是否已有 session
+export async function findExistingSlotSession(
+  courseId: string,
+  moduleId: string,
+  slot: { date: string; startTime: string },
+): Promise<CourseSessionDoc | null> {
+  const q = query(
+    collection(db, COURSE_SESSIONS_COLLECTION),
+    where('courseId', '==', courseId),
+    where('moduleId', '==', moduleId),
+    where('date', '==', slot.date),
+    where('startTime', '==', slot.startTime),
+  );
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  return snapshotToCS(snap.docs[0]);
+}
+
+// 建立場次（直接給完整 input 的低階介面，保留給雜項場次）
 export async function createCourseSession(input: NewCourseSessionInput): Promise<void> {
   if (!input.courseSessionId.trim()) throw new Error('場次代碼不可為空');
   if (!input.courseId.trim()) throw new Error('缺少課程代碼');
@@ -99,27 +165,36 @@ export async function createCourseSession(input: NewCourseSessionInput): Promise
     notes: input.notes?.trim() ?? '',
   });
 
-  // 從 enrollments 撈 active 學員，逐筆建立 ABSENT 出席紀錄
+  await materializeAttendance(input.courseSessionId, input.courseId, input.moduleId ?? '', input.branchId);
+}
+
+// 內部共用：依 active enrollments 物化某場次的 course_attendance（status='SCHEDULED'）
+async function materializeAttendance(
+  courseSessionId: string,
+  courseId: string,
+  moduleId: string,
+  branchId: string,
+): Promise<void> {
   const enrollSnap = await getDocs(
     query(
       collection(db, COURSE_ENROLLMENTS_COLLECTION),
-      where('courseId', '==', input.courseId),
+      where('courseId', '==', courseId),
       where('status', '==', 'active'),
     ),
   );
   if (enrollSnap.empty) return;
 
-  let batch = writeBatch(db);
+  let batch: WriteBatch = writeBatch(db);
   let n = 0;
   for (const d of enrollSnap.docs) {
     const en = d.data() as CourseEnrollmentDoc;
-    const recId = courseAttendanceDocId(input.courseSessionId, en.studentId);
+    const recId = courseAttendanceDocId(courseSessionId, en.studentId);
     const ref = doc(db, COURSE_ATTENDANCE_COLLECTION, recId);
     batch.set(ref, {
-      courseSessionId: input.courseSessionId,
-      courseId: input.courseId,
-      moduleId: input.moduleId ?? '',
-      branchId: input.branchId,
+      courseSessionId,
+      courseId,
+      moduleId,
+      branchId,
       studentId: en.studentId,
       studentName: en.studentName,
       status: 'SCHEDULED',

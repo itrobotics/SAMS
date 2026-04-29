@@ -1,10 +1,8 @@
 // 課程方案場次出席管理頁
 //
 // /courses/:courseId/sessions/:courseSessionId
-// 類似 SessionPage：列出本場次所有 course_attendance，可手動切換狀態。
-// 與班級 attendance 的差異：
-//   - 沒有 SCHEDULED：建立場次時即以 ABSENT 寫入，老師標「已到」覆寫即可
-//   - method 永遠是 MANUAL（人臉辨識僅班級用）
+// 列出本場次所有 course_attendance；老師可逐位切「應到 / 已到 / 遲到 / 請假 / 未到」。
+// 頂部提供「標記為已完成」/「標記為取消」按鈕，狀態為 'completed' 才會計入課程方案實際時數。
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
@@ -17,6 +15,7 @@ import {
   subscribeCourseAttendance,
   updateCourseAttendance,
 } from '../services/courseAttendance';
+import { updateCourseSession } from '../services/courseSessions';
 import { ROUTES } from '../routes/paths';
 import { formatTimeWithSec } from '../utils/date';
 import { canAccessBranch } from '../types/user';
@@ -24,6 +23,7 @@ import {
   COURSE_SESSIONS_COLLECTION,
   COURSE_SESSION_STATUS_LABELS,
   type CourseSessionDoc,
+  type CourseSessionStatus,
 } from '../types/courseSession';
 import {
   COURSE_ATTENDANCE_STATUSES,
@@ -81,6 +81,24 @@ export function CourseSessionPage() {
     }
   }
 
+  async function setSessionStatus(target: CourseSessionStatus) {
+    if (!courseSessionId) return;
+    const labels: Record<CourseSessionStatus, string> = {
+      scheduled: '待上課',
+      completed: '已完成',
+      cancelled: '已取消',
+    };
+    if (!window.confirm(`將本場次狀態改為「${labels[target]}」？\n${target === 'completed' ? '時數會計入課程方案實際時數。' : ''}`)) return;
+    setBusyId('__session__');
+    try {
+      await updateCourseSession(courseSessionId, { status: target });
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '操作失敗');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const counts = useMemo(() => {
     const acc: Record<CourseAttendanceStatus, number> = {
       SCHEDULED: 0, CHECKED_IN: 0, LATE: 0, LEAVE: 0, ABSENT: 0,
@@ -108,7 +126,7 @@ export function CourseSessionPage() {
   return (
     <section>
       <header style={styles.header}>
-        <div>
+        <div style={{ flex: 1 }}>
           <Link to={ROUTES.courseDetail(session.courseId)} style={styles.back}>
             ← 回課程方案
           </Link>
@@ -119,10 +137,30 @@ export function CourseSessionPage() {
             {session.classroom ? ` · 教室 ${session.classroom}` : ''}
             {session.instructorId ? ` · 講師 ${session.instructorId}` : ''}
             {' · '}<code>{session.courseSessionId}</code>
-            {' · '}{COURSE_SESSION_STATUS_LABELS[session.status]}
+            {' · '}<SessionStatusPill status={session.status} />
           </p>
           {session.notes && (
             <p style={styles.notes}>備註：{session.notes}</p>
+          )}
+        </div>
+        <div style={styles.statusActions}>
+          <SessionStatusBtn
+            label="標記為已完成"
+            primary
+            disabled={busyId === '__session__' || session.status === 'completed'}
+            onClick={() => setSessionStatus('completed')}
+          />
+          <SessionStatusBtn
+            label="標記為取消"
+            disabled={busyId === '__session__' || session.status === 'cancelled'}
+            onClick={() => setSessionStatus('cancelled')}
+          />
+          {session.status !== 'scheduled' && (
+            <SessionStatusBtn
+              label="重設為待上課"
+              disabled={busyId === '__session__'}
+              onClick={() => setSessionStatus('scheduled')}
+            />
           )}
         </div>
       </header>
@@ -244,6 +282,45 @@ function StatusPill({ status }: { status: CourseAttendanceStatus }) {
   );
 }
 
+function SessionStatusPill({ status }: { status: CourseSessionStatus }) {
+  const map: Record<CourseSessionStatus, { bg: string; fg: string }> = {
+    scheduled: { bg: '#dbeafe', fg: '#1e40af' },
+    completed: { bg: '#dcfce7', fg: '#166534' },
+    cancelled: { bg: '#fee2e2', fg: '#b91c1c' },
+  };
+  const c = map[status];
+  return (
+    <span style={{ padding: '0.15rem 0.55rem', borderRadius: 12, fontSize: '0.8rem', background: c.bg, color: c.fg }}>
+      {COURSE_SESSION_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+function SessionStatusBtn({
+  label, primary, disabled, onClick,
+}: { label: string; primary?: boolean; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: '0.4rem 0.85rem',
+        fontSize: '0.85rem',
+        borderRadius: 6,
+        border: primary ? 'none' : '1px solid #d1d5db',
+        background: primary ? '#16a34a' : '#fff',
+        color: primary ? '#fff' : '#374151',
+        fontWeight: primary ? 600 : 400,
+        opacity: disabled ? 0.55 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 function SummaryPill({
   label, value, status,
 }: { label: string; value: number; status?: CourseAttendanceStatus }) {
@@ -259,7 +336,13 @@ function SummaryPill({
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  header: { marginBottom: '1.25rem' },
+  header: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+    marginBottom: '1.25rem', gap: '1rem', flexWrap: 'wrap',
+  },
+  statusActions: {
+    display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'flex-start',
+  },
   back: { color: '#6b7280', fontSize: '0.9rem', display: 'inline-block', marginBottom: '0.5rem' },
   title: { margin: 0, fontSize: '1.5rem' },
   subtitle: { margin: '0.4rem 0 0', color: '#6b7280', fontSize: '0.9rem' },

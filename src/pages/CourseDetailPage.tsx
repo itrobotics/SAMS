@@ -1,24 +1,32 @@
 // 課程方案詳情頁
 //
-// 四個區塊：基本資訊 + 單元列表 + 學員名單（左右兩欄加入/移除）+ 場次列表
+// 三個區塊：
+//   1) 基本資訊（含進度條：實際/計畫時數）
+//   2) 課程單元 — 每個 module 展開列出該 module 的 slots；每筆 slot 可「開啟」變場次
+//   3) 學員名單（左右兩欄加入/移除）
+//
+// 設計：
+//   - 「排定場次」不再是獨立區塊；場次是從 slot 開啟出來的
+//   - 開啟過的 slot 會顯示「進入報到 →」連結到報到頁
+//   - 開啟前的 slot 顯示「開啟」按鈕
+//   - 已開啟的 slot 旁邊也提供「取消開啟」（= 刪除該場次 + 出席紀錄）
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 
 import { CourseModuleFormDialog } from '../components/CourseModuleFormDialog';
-import { CourseSessionFormDialog } from '../components/CourseSessionFormDialog';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { db } from '../services/firebase';
 import { deleteCourseDeep } from '../services/courses';
 import {
   deleteCourseModule,
-  fetchModuleActualHours,
   subscribeCourseModules,
 } from '../services/courseModules';
 import {
   deleteCourseSession,
+  openCourseSessionFromSlot,
   subscribeCourseSessions,
 } from '../services/courseSessions';
 import {
@@ -36,7 +44,11 @@ import {
   COURSE_STATUS_LABELS,
   type CourseDoc,
 } from '../types/course';
-import type { CourseModuleDoc } from '../types/courseModule';
+import {
+  sumSlotHours,
+  type CourseModuleDoc,
+  type CourseModuleSlot,
+} from '../types/courseModule';
 import type { CourseSessionDoc } from '../types/courseSession';
 import { COURSE_SESSION_STATUS_LABELS } from '../types/courseSession';
 import {
@@ -46,6 +58,11 @@ import {
 } from '../types/courseEnrollment';
 import type { InstructorDoc } from '../types/instructor';
 import type { StudentDoc } from '../types/student';
+
+// 用 (moduleId, date, startTime) 當 key 找該 slot 是否已被開啟為場次
+function slotKey(moduleId: string, slot: { date: string; startTime: string }): string {
+  return `${moduleId}|${slot.date}|${slot.startTime}`;
+}
 
 export function CourseDetailPage() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -58,7 +75,6 @@ export function CourseDetailPage() {
   const [enrollments, setEnrollments] = useState<CourseEnrollmentDoc[]>([]);
   const [allStudents, setAllStudents] = useState<StudentDoc[]>([]);
   const [instructorMap, setInstructorMap] = useState<Map<string, string>>(new Map());
-  const [moduleActualHours, setModuleActualHours] = useState<Map<string, number>>(new Map());
 
   const [keyword, setKeyword] = useState('');
   const [candidateBranch, setCandidateBranch] = useState('');
@@ -67,8 +83,6 @@ export function CourseDetailPage() {
 
   const [moduleEditing, setModuleEditing] = useState<CourseModuleDoc | null>(null);
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
-  const [sessionEditing, setSessionEditing] = useState<CourseSessionDoc | null>(null);
-  const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
 
   // 訂閱 course
   useEffect(() => {
@@ -109,15 +123,25 @@ export function CourseDetailPage() {
     });
   }, []);
 
-  // 計算每個 module 已完成時數（每次 sessions 變動就重算 — 直接用 sessions state 算就好）
-  useEffect(() => {
+  // (moduleId|date|startTime) → CourseSessionDoc，給 slot 列查找用
+  const sessionsBySlot = useMemo(() => {
+    const map = new Map<string, CourseSessionDoc>();
+    for (const s of sessions) {
+      if (!s.moduleId) continue;
+      map.set(slotKey(s.moduleId, s), s);
+    }
+    return map;
+  }, [sessions]);
+
+  // 已完成時數 by moduleId
+  const moduleActualHours = useMemo(() => {
     const totals = new Map<string, number>();
     for (const s of sessions) {
       if (s.status !== 'completed') continue;
       if (!s.moduleId) continue;
       totals.set(s.moduleId, (totals.get(s.moduleId) ?? 0) + (Number(s.hours) || 0));
     }
-    setModuleActualHours(totals);
+    return totals;
   }, [sessions]);
 
   // 即使 course 未載入也要呼叫 hooks
@@ -152,6 +176,16 @@ export function CourseDetailPage() {
     return sum;
   }, [sessions]);
 
+  // 「計畫時數」改成由所有 module slots 自動加總（取代手填的 totalPlannedHours）
+  const totalPlannedFromSlots = useMemo(() => {
+    let sum = 0;
+    for (const m of modules) {
+      if (!m.active) continue;
+      sum += sumSlotHours(m.slots);
+    }
+    return Math.round(sum * 100) / 100;
+  }, [modules]);
+
   if (course === null) return <div style={{ color: '#6b7280' }}>載入中…</div>;
   if (course === 'missing') {
     return (
@@ -173,7 +207,8 @@ export function CourseDetailPage() {
   }
 
   const branchName = branches.find((b) => b.branchId === course.branchId)?.name ?? course.branchId;
-  const planned = course.totalPlannedHours || 0;
+  // 顯示用：優先 course.totalPlannedHours（手填目標）；若 0 則用 slot 加總
+  const planned = course.totalPlannedHours > 0 ? course.totalPlannedHours : totalPlannedFromSlots;
   const pct = planned > 0 ? Math.min(100, Math.round((totalActual / planned) * 100)) : 0;
   const canEdit = user?.role !== 'teacher';
 
@@ -220,7 +255,7 @@ export function CourseDetailPage() {
   }
 
   async function handleDeleteModule(m: CourseModuleDoc) {
-    if (!window.confirm(`確定要停用單元「${m.name}」？已建立的場次仍會保留。`)) return;
+    if (!window.confirm(`確定要停用單元「${m.name}」？已開啟的場次仍會保留。`)) return;
     setBusyId(m.moduleId);
     try {
       await deleteCourseModule(m.moduleId);
@@ -231,13 +266,26 @@ export function CourseDetailPage() {
     }
   }
 
-  async function handleDeleteSession(s: CourseSessionDoc) {
-    if (!window.confirm(`確定刪除場次（${s.date} ${s.startTime}）？\n此操作無法復原，出席紀錄將一併刪除。`)) return;
-    setBusyId(s.courseSessionId);
+  async function handleOpenSlot(m: CourseModuleDoc, slot: CourseModuleSlot, label: string) {
+    if (!window.confirm(`確定要開啟場次「${label}」？\n會為當下 ${activeEnrollments.length} 位在訓學員建立應到名單。`)) return;
+    const key = slotKey(m.moduleId, slot);
+    setBusyId(key);
     try {
-      await deleteCourseSession(s.courseSessionId);
+      await openCourseSessionFromSlot(m, slot);
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : '刪除失敗');
+      window.alert(e instanceof Error ? e.message : '開啟失敗');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleCancelSlot(session: CourseSessionDoc, label: string) {
+    if (!window.confirm(`確定取消開啟「${label}」？\n該場次與所有出席紀錄會一併刪除。`)) return;
+    setBusyId(session.courseSessionId);
+    try {
+      await deleteCourseSession(session.courseSessionId);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '取消失敗');
     } finally {
       setBusyId(null);
     }
@@ -261,14 +309,6 @@ export function CourseDetailPage() {
     if (!id) return '—';
     const name = instructorMap.get(id);
     return name ? `${id} ${name}` : id;
-  }
-
-  // 一次性 refresh module actual hours（給 child save 時可呼叫）
-  async function refreshModuleHours() {
-    if (!courseId) return;
-    try {
-      setModuleActualHours(await fetchModuleActualHours(courseId));
-    } catch { /* ignore */ }
   }
 
   return (
@@ -323,10 +363,15 @@ export function CourseDetailPage() {
 
       {error && <div style={styles.error}>{error}</div>}
 
-      {/* === 單元列表 === */}
+      {/* === 課程單元（含展開的時段列表）=== */}
       <article style={styles.card}>
         <header style={styles.cardHeader}>
-          <h2 style={styles.h2}>課程單元（{modules.filter((m) => m.active).length}）</h2>
+          <h2 style={styles.h2}>
+            課程單元（{modules.filter((m) => m.active).length}）
+            <span style={styles.h2Sub}>
+              · 計畫總時數 {totalPlannedFromSlots} h · 已完成 {totalActual} h
+            </span>
+          </h2>
           {canEdit && (
             <button type="button" style={styles.smallPrimaryBtn}
               onClick={() => { setModuleEditing(null); setModuleDialogOpen(true); }}>
@@ -334,59 +379,127 @@ export function CourseDetailPage() {
             </button>
           )}
         </header>
-        {modules.length === 0 ? (
-          <p style={styles.placeholder}>還沒有單元</p>
-        ) : (
-          <table style={styles.subTable}>
-            <thead>
-              <tr>
-                <th style={styles.subTh}>排序</th>
-                <th style={styles.subTh}>代碼</th>
-                <th style={styles.subTh}>名稱</th>
-                <th style={styles.subThNum}>計畫時數</th>
-                <th style={styles.subThNum}>已完成</th>
-                <th style={styles.subTh}>狀態</th>
-                <th style={styles.subTh}>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {modules.map((m) => (
-                <tr key={m.moduleId}>
-                  <td style={styles.subTd}>{m.order ?? 0}</td>
-                  <td style={styles.subTd}><code>{m.moduleId}</code></td>
-                  <td style={styles.subTd}>{m.name}</td>
-                  <td style={styles.subTdNum}>{m.plannedHours}</td>
-                  <td style={styles.subTdNum}>{moduleActualHours.get(m.moduleId) ?? 0}</td>
-                  <td style={styles.subTd}>
-                    <span style={m.active ? styles.pillActive : styles.pillInactive}>
-                      {m.active ? '啟用' : '停用'}
-                    </span>
-                  </td>
-                  <td style={styles.subTd}>
-                    {canEdit && (
-                      <>
-                        <button type="button" style={styles.linkBtn}
-                          onClick={() => { setModuleEditing(m); setModuleDialogOpen(true); }}>
-                          編輯
-                        </button>
-                        {m.active && (
-                          <button
-                            type="button"
-                            style={{ ...styles.linkBtn, color: '#b91c1c' }}
-                            onClick={() => handleDeleteModule(m)}
-                            disabled={busyId === m.moduleId}
-                          >
-                            停用
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        {modules.length === 0 && (
+          <p style={styles.placeholder}>還沒有單元。建立單元並排定時段，老師才能在課堂上開啟報到。</p>
         )}
+
+        {modules.map((m) => {
+          const planned = sumSlotHours(m.slots);
+          const actual = moduleActualHours.get(m.moduleId) ?? 0;
+          return (
+            <div key={m.moduleId} style={styles.moduleBlock}>
+              <header style={styles.moduleHeader}>
+                <div>
+                  <span style={styles.moduleTitle}>
+                    <code>{m.moduleId}</code> {m.name}
+                  </span>
+                  <span style={styles.moduleMeta}>
+                    講師 {instructorLabel(m.instructorId)}
+                    {m.classroom ? ` · 教室 ${m.classroom}` : ''}
+                    {' · 計畫 '}{planned}h
+                    {' · 已完成 '}{actual}h
+                  </span>
+                  {!m.active && (
+                    <span style={{ ...styles.pillInactive, marginLeft: '0.4rem' }}>已停用</span>
+                  )}
+                </div>
+                {canEdit && (
+                  <span>
+                    <button type="button" style={styles.linkBtn}
+                      onClick={() => { setModuleEditing(m); setModuleDialogOpen(true); }}>
+                      編輯
+                    </button>
+                    {m.active && (
+                      <button
+                        type="button"
+                        style={{ ...styles.linkBtn, color: '#b91c1c' }}
+                        onClick={() => handleDeleteModule(m)}
+                        disabled={busyId === m.moduleId}
+                      >
+                        停用
+                      </button>
+                    )}
+                  </span>
+                )}
+              </header>
+
+              {(m.slots ?? []).length === 0 ? (
+                <p style={{ ...styles.placeholder, marginLeft: '0.5rem' }}>
+                  此單元尚未排定時段，點「編輯」加入時段。
+                </p>
+              ) : (
+                <table style={styles.slotTable}>
+                  <thead>
+                    <tr>
+                      <th style={styles.slotTh}>序號</th>
+                      <th style={styles.slotTh}>日期</th>
+                      <th style={styles.slotTh}>時間</th>
+                      <th style={styles.slotThNum}>時數</th>
+                      <th style={styles.slotTh}>狀態</th>
+                      <th style={styles.slotTh}>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {m.slots.map((slot, idx) => {
+                      const session = sessionsBySlot.get(slotKey(m.moduleId, slot));
+                      const slotLabelStr = `${m.moduleId}-${idx + 1}`;
+                      const key = slotKey(m.moduleId, slot);
+                      return (
+                        <tr key={`${slotLabelStr}|${slot.date}|${slot.startTime}`}>
+                          <td style={styles.slotTd}>
+                            <code style={{ fontSize: '0.85rem' }}>{slotLabelStr}</code>
+                          </td>
+                          <td style={styles.slotTd}>{slot.date}</td>
+                          <td style={styles.slotTd}>{slot.startTime}–{slot.endTime}</td>
+                          <td style={styles.slotTdNum}>{slot.hours}</td>
+                          <td style={styles.slotTd}>
+                            {session ? (
+                              <CourseSessionStatusPill status={session.status} />
+                            ) : (
+                              <span style={styles.pillNotOpened}>尚未開啟</span>
+                            )}
+                          </td>
+                          <td style={styles.slotTd}>
+                            {session ? (
+                              <>
+                                <Link to={ROUTES.courseSession(courseId!, session.courseSessionId)}
+                                  style={styles.linkBtn}>
+                                  進入報到 →
+                                </Link>
+                                {canEdit && (
+                                  <button
+                                    type="button"
+                                    style={{ ...styles.linkBtn, color: '#b91c1c' }}
+                                    onClick={() => handleCancelSlot(session, slotLabelStr)}
+                                    disabled={busyId === session.courseSessionId}
+                                  >
+                                    {busyId === session.courseSessionId ? '處理中…' : '取消開啟'}
+                                  </button>
+                                )}
+                              </>
+                            ) : canEdit ? (
+                              <button
+                                type="button"
+                                style={styles.openBtn}
+                                onClick={() => handleOpenSlot(m, slot, slotLabelStr)}
+                                disabled={busyId === key}
+                              >
+                                {busyId === key ? '處理中…' : '開啟報到'}
+                              </button>
+                            ) : (
+                              <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          );
+        })}
       </article>
 
       {/* === 學員名單（左右兩欄）=== */}
@@ -433,7 +546,6 @@ export function CourseDetailPage() {
             })}
           </ul>
 
-          {/* 已退訓 / 已完成 學員 */}
           {enrollments.some((e) => e.status !== 'active') && (
             <details style={{ marginTop: '0.75rem' }}>
               <summary style={{ cursor: 'pointer', color: '#6b7280' }}>
@@ -520,98 +632,18 @@ export function CourseDetailPage() {
         </article>
       </div>
 
-      {/* === 場次列表 === */}
-      <article style={styles.card}>
-        <header style={styles.cardHeader}>
-          <h2 style={styles.h2}>排定場次（{sessions.length}）</h2>
-          {canEdit && (
-            <button type="button" style={styles.smallPrimaryBtn}
-              onClick={() => { setSessionEditing(null); setSessionDialogOpen(true); }}>
-              ＋ 新增場次
-            </button>
-          )}
-        </header>
-        {sessions.length === 0 ? (
-          <p style={styles.placeholder}>還沒有場次</p>
-        ) : (
-          <table style={styles.subTable}>
-            <thead>
-              <tr>
-                <th style={styles.subTh}>日期</th>
-                <th style={styles.subTh}>時間</th>
-                <th style={styles.subThNum}>時數</th>
-                <th style={styles.subTh}>單元</th>
-                <th style={styles.subTh}>講師</th>
-                <th style={styles.subTh}>教室</th>
-                <th style={styles.subTh}>狀態</th>
-                <th style={styles.subTh}>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sessions.map((s) => {
-                const m = modules.find((mm) => mm.moduleId === s.moduleId);
-                return (
-                  <tr key={s.courseSessionId}>
-                    <td style={styles.subTd}>{s.date}</td>
-                    <td style={styles.subTd}>{s.startTime}–{s.endTime}</td>
-                    <td style={styles.subTdNum}>{s.hours}</td>
-                    <td style={styles.subTd}>{m?.name ?? '—'}</td>
-                    <td style={styles.subTd}>{instructorLabel(s.instructorId)}</td>
-                    <td style={styles.subTd}>{s.classroom || '—'}</td>
-                    <td style={styles.subTd}>
-                      <CourseSessionStatusPill status={s.status} />
-                    </td>
-                    <td style={styles.subTd}>
-                      <Link to={ROUTES.courseSession(courseId!, s.courseSessionId)} style={styles.linkBtn}>
-                        進入報到 →
-                      </Link>
-                      {canEdit && (
-                        <>
-                          <button type="button" style={styles.linkBtn}
-                            onClick={() => { setSessionEditing(s); setSessionDialogOpen(true); }}>
-                            編輯
-                          </button>
-                          <button
-                            type="button"
-                            style={{ ...styles.linkBtn, color: '#b91c1c' }}
-                            onClick={() => handleDeleteSession(s)}
-                            disabled={busyId === s.courseSessionId}
-                          >
-                            {busyId === s.courseSessionId ? '刪除中…' : '刪除'}
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </article>
-
       <CourseModuleFormDialog
         open={moduleDialogOpen}
         initial={moduleEditing}
         courseId={courseId!}
         branchId={course.branchId}
         defaultOrder={modules.length}
-        onClose={() => setModuleDialogOpen(false)}
-        onSaved={() => { /* realtime listener 自動更新 */ }}
-      />
-
-      <CourseSessionFormDialog
-        open={sessionDialogOpen}
-        initial={sessionEditing}
-        courseId={courseId!}
-        branchId={course.branchId}
-        modules={modules.filter((m) => m.active)}
         defaults={{
           instructorId: course.defaultInstructorId,
           classroom: course.defaultClassroom,
         }}
-        onClose={() => setSessionDialogOpen(false)}
-        onSaved={() => { void refreshModuleHours(); }}
+        onClose={() => setModuleDialogOpen(false)}
+        onSaved={() => { /* realtime listener 自動更新 */ }}
       />
     </section>
   );
@@ -619,7 +651,7 @@ export function CourseDetailPage() {
 
 function CourseSessionStatusPill({ status }: { status: CourseSessionDoc['status'] }) {
   const map = {
-    scheduled: { bg: '#f3f4f6', fg: '#6b7280' },
+    scheduled: { bg: '#dbeafe', fg: '#1e40af' },
     completed: { bg: '#dcfce7', fg: '#166534' },
     cancelled: { bg: '#fee2e2', fg: '#b91c1c' },
   } as const;
@@ -665,6 +697,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '0.75rem',
   },
   h2: { margin: 0, fontSize: '1.05rem', color: '#374151' },
+  h2Sub: { fontSize: '0.85rem', color: '#9ca3af', fontWeight: 400, marginLeft: '0.5rem' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1rem', marginBottom: '1rem' },
   search: {
     width: '100%', padding: '0.5rem 0.7rem', fontSize: '0.9rem',
@@ -696,20 +729,47 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0.45rem 0.85rem', background: '#fff', color: '#b91c1c',
     border: '1px solid #fecaca', borderRadius: 6, fontSize: '0.85rem',
   },
+  openBtn: {
+    padding: '0.3rem 0.7rem', background: '#16a34a', color: '#fff',
+    border: 'none', borderRadius: 6, fontSize: '0.85rem', fontWeight: 600,
+  },
   placeholder: { color: '#9ca3af', fontSize: '0.9rem', margin: '0.5rem 0', fontStyle: 'italic' },
 
   pillActive: { padding: '0.1rem 0.5rem', borderRadius: 12, fontSize: '0.8rem', background: '#dcfce7', color: '#166534' },
   pillInactive: { padding: '0.1rem 0.5rem', borderRadius: 12, fontSize: '0.8rem', background: '#f3f4f6', color: '#6b7280' },
+  pillNotOpened: { padding: '0.1rem 0.5rem', borderRadius: 12, fontSize: '0.8rem', background: '#f9fafb', color: '#9ca3af', border: '1px dashed #d1d5db' },
 
-  subTable: { width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' },
-  subTh: {
-    textAlign: 'left', padding: '0.55rem 0.7rem', borderBottom: '1px solid #e5e7eb',
-    background: '#f9fafb', fontWeight: 600, whiteSpace: 'nowrap',
+  // === module 區塊與 slot 表格 ===
+  moduleBlock: {
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    padding: '0.75rem 1rem',
+    marginBottom: '0.85rem',
   },
-  subThNum: {
-    textAlign: 'right', padding: '0.55rem 0.7rem', borderBottom: '1px solid #e5e7eb',
-    background: '#f9fafb', fontWeight: 600, whiteSpace: 'nowrap',
+  moduleHeader: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    paddingBottom: '0.5rem', marginBottom: '0.5rem',
+    borderBottom: '1px solid #f3f4f6', flexWrap: 'wrap', gap: '0.5rem',
   },
-  subTd: { padding: '0.5rem 0.7rem', borderBottom: '1px solid #f3f4f6' },
-  subTdNum: { padding: '0.5rem 0.7rem', borderBottom: '1px solid #f3f4f6', textAlign: 'right', fontVariantNumeric: 'tabular-nums' },
+  moduleTitle: {
+    fontSize: '1rem', color: '#1f2937', fontWeight: 600,
+  },
+  moduleMeta: {
+    color: '#6b7280', fontSize: '0.85rem', marginLeft: '0.6rem',
+  },
+
+  slotTable: { width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' },
+  slotTh: {
+    textAlign: 'left', padding: '0.4rem 0.6rem', borderBottom: '1px solid #e5e7eb',
+    background: '#f9fafb', fontWeight: 600, fontSize: '0.8rem', color: '#6b7280', whiteSpace: 'nowrap',
+  },
+  slotThNum: {
+    textAlign: 'right', padding: '0.4rem 0.6rem', borderBottom: '1px solid #e5e7eb',
+    background: '#f9fafb', fontWeight: 600, fontSize: '0.8rem', color: '#6b7280', whiteSpace: 'nowrap',
+  },
+  slotTd: { padding: '0.45rem 0.6rem', borderBottom: '1px solid #f3f4f6' },
+  slotTdNum: {
+    padding: '0.45rem 0.6rem', borderBottom: '1px solid #f3f4f6',
+    textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+  },
 };

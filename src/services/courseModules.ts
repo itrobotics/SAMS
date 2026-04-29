@@ -18,7 +18,10 @@ import {
 import { db } from './firebase';
 import {
   COURSE_MODULES_COLLECTION,
+  sortSlots,
+  validateSlots,
   type CourseModuleDoc,
+  type CourseModuleSlot,
   type NewCourseModuleInput,
   type UpdateCourseModuleInput,
 } from '../types/courseModule';
@@ -32,7 +35,19 @@ function moduleRef(moduleId: string) {
 }
 
 function snapshotToModule(snap: { id: string; data: () => Record<string, unknown> }): CourseModuleDoc {
-  return { moduleId: snap.id, ...(snap.data() as Omit<CourseModuleDoc, 'moduleId'>) };
+  const data = snap.data() as Partial<Omit<CourseModuleDoc, 'moduleId'>>;
+  return {
+    moduleId: snap.id,
+    courseId: data.courseId ?? '',
+    branchId: data.branchId ?? '',
+    name: data.name ?? '',
+    instructorId: data.instructorId ?? '',
+    classroom: data.classroom ?? '',
+    slots: Array.isArray(data.slots) ? data.slots : [],
+    actualHours: data.actualHours ?? 0,
+    order: data.order ?? 0,
+    active: data.active ?? true,
+  };
 }
 
 export async function fetchCourseModule(moduleId: string): Promise<CourseModuleDoc | null> {
@@ -65,10 +80,8 @@ export async function createCourseModule(input: NewCourseModuleInput): Promise<v
   if (!input.moduleId.trim()) throw new Error('單元代碼不可為空');
   if (!input.courseId.trim()) throw new Error('缺少課程代碼');
   if (!input.name.trim()) throw new Error('請填寫單元名稱');
-  const planned = Number(input.plannedHours);
-  if (!Number.isFinite(planned) || planned < 0) {
-    throw new Error('計畫時數必須為非負數');
-  }
+  validateSlots(input.slots ?? []);
+
   const existing = await getDoc(moduleRef(input.moduleId));
   if (existing.exists()) throw new Error(`單元代碼「${input.moduleId}」已存在`);
 
@@ -76,7 +89,9 @@ export async function createCourseModule(input: NewCourseModuleInput): Promise<v
     courseId: input.courseId,
     branchId: input.branchId,
     name: input.name.trim(),
-    plannedHours: planned,
+    instructorId: input.instructorId?.trim() ?? '',
+    classroom: input.classroom?.trim() ?? '',
+    slots: sortSlots(input.slots ?? []).map(stripSlot),
     actualHours: 0,
     order: input.order ?? 0,
     active: input.active ?? true,
@@ -86,7 +101,12 @@ export async function createCourseModule(input: NewCourseModuleInput): Promise<v
 export async function updateCourseModule(moduleId: string, patch: UpdateCourseModuleInput): Promise<void> {
   const cleaned: Record<string, unknown> = {};
   if (patch.name !== undefined) cleaned.name = patch.name.trim();
-  if (patch.plannedHours !== undefined) cleaned.plannedHours = patch.plannedHours;
+  if (patch.instructorId !== undefined) cleaned.instructorId = patch.instructorId.trim();
+  if (patch.classroom !== undefined) cleaned.classroom = patch.classroom.trim();
+  if (patch.slots !== undefined) {
+    validateSlots(patch.slots);
+    cleaned.slots = sortSlots(patch.slots).map(stripSlot);
+  }
   if (patch.actualHours !== undefined) cleaned.actualHours = patch.actualHours;
   if (patch.order !== undefined) cleaned.order = patch.order;
   if (patch.active !== undefined) cleaned.active = patch.active;
@@ -114,4 +134,14 @@ export async function fetchModuleActualHours(courseId: string): Promise<Map<stri
     totals.set(data.moduleId, cur + (Number(data.hours) || 0));
   });
   return totals;
+}
+
+// Firestore 不允許 undefined 欄位，把 slot 正規化為純數值欄位後再寫入
+function stripSlot(s: CourseModuleSlot): Record<string, unknown> {
+  return {
+    date: s.date,
+    startTime: s.startTime,
+    endTime: s.endTime,
+    hours: Number(s.hours) || 0,
+  };
 }
