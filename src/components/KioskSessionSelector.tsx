@@ -1,98 +1,115 @@
-// Kiosk session selector（Task 031）
+// Kiosk session selector（Task 031 + 課程方案延伸）
 //
 // Kiosk 啟動前要先選定「比對哪些場次的學生」。同一時段可能有多班同時上課，
 // 因此採多選；預設勾選「目前進行中或即將開始」的 sessions：
 //   - 進行中：start - openBefore <= now <= end + closeAfter
 //   - 即將開始：start - openBefore <= now < start
 //
-// openBefore / closeAfter 預設 30/60 分（spec / settings 預設值）。
-// 沒有 sessions 時提示去設定頁產生。
+// 課程方案場次也納入清單，與班級場次並列。selection set 用前綴區分：
+//   - `class:${sessionId}` 班級場次
+//   - `course:${courseSessionId}` 課程方案場次
 
 import { useMemo } from 'react';
 
-import { useBranchDaySessionsRealtime } from '../hooks/useRealtime';
+import {
+  useBranchDayCourseSessionsRealtime,
+  useBranchDaySessionsRealtime,
+} from '../hooks/useRealtime';
 import { todayISO, timeToMinutes } from '../utils/date';
 import type { SessionDoc } from '../types/session';
+import type { CourseSessionDoc } from '../types/courseSession';
 
 interface KioskSessionSelectorProps {
   branchId: string;
-  selected: Set<string>; // sessionId set
-  onToggle: (sessionId: string) => void;
+  selected: Set<string>; // 'class:xxx' | 'course:xxx'
+  onToggle: (sessionKey: string) => void;
   onConfirm: () => void;
 }
 
 const DEFAULT_OPEN_BEFORE = 30;
 const DEFAULT_CLOSE_AFTER = 60;
 
+export function classKey(sessionId: string): string {
+  return `class:${sessionId}`;
+}
+export function courseKey(courseSessionId: string): string {
+  return `course:${courseSessionId}`;
+}
+export function parseKey(k: string): { type: 'class' | 'course'; id: string } | null {
+  if (k.startsWith('class:')) return { type: 'class', id: k.slice(6) };
+  if (k.startsWith('course:')) return { type: 'course', id: k.slice(7) };
+  return null;
+}
+
 export function KioskSessionSelector({
   branchId, selected, onToggle, onConfirm,
 }: KioskSessionSelectorProps) {
   const today = todayISO();
   const { data: sessions, loading } = useBranchDaySessionsRealtime(branchId, today);
+  const { data: courseSessions, loading: courseLoading } =
+    useBranchDayCourseSessionsRealtime(branchId, today);
 
   const inWindow = useMemo(() => {
     const nowMin = nowMinutes();
-    return (s: SessionDoc) => {
+    return (s: { startTime: string; endTime: string }) => {
       const start = timeToMinutes(s.startTime);
       const end = timeToMinutes(s.endTime);
       return nowMin >= start - DEFAULT_OPEN_BEFORE && nowMin <= end + DEFAULT_CLOSE_AFTER;
     };
   }, []);
 
-  // 預設勾選：第一次渲染時，把符合 inWindow 的 sessionId 自動勾起來
-  // （不在這裡寫 setState；交給上層管理 selected。為了避免無限 re-render，
-  //  上層會在 sessions 第一次載入後同步 inWindow 結果到 selected）
-
   const canStart = selected.size > 0;
+  const isLoading = loading || courseLoading;
+  const noSessions = !isLoading && sessions.length === 0 && courseSessions.length === 0;
 
   return (
     <div style={styles.panel}>
       <h2 style={styles.title}>選擇比對場次</h2>
       <p style={styles.subtitle}>
-        Kiosk 只會比對「已勾選場次的應到學生」— 預設已勾選目前進行中或即將開始的班級。
+        Kiosk 只會比對「已勾選場次的應到學生」— 預設已勾選目前進行中或即將開始的場次。
       </p>
 
-      {loading && <div style={styles.empty}>載入今日場次…</div>}
-      {!loading && sessions.length === 0 && (
+      {isLoading && <div style={styles.empty}>載入今日場次…</div>}
+      {noSessions && (
         <div style={styles.empty}>
           <p>今日 {today} 尚無場次。</p>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
-            請至「設定 → 每日場次產生」建立後再回來。
+            班級：請至「設定 → 每日場次產生」建立。<br />
+            課程方案：請至「課程方案 → 單元」開啟報到。
           </p>
         </div>
       )}
 
-      {sessions.length > 0 && (
-        <ul style={styles.list}>
-          {sessions.map((s) => {
-            const active = inWindow(s);
-            const isChecked = selected.has(s.sessionId);
-            return (
-              <li
-                key={s.sessionId}
-                style={{ ...styles.row, ...(isChecked ? styles.rowSelected : null) }}
-                onClick={() => onToggle(s.sessionId)}
-              >
-                <input
-                  type="checkbox"
-                  checked={isChecked}
-                  onChange={() => onToggle(s.sessionId)}
-                  onClick={(e) => e.stopPropagation()}
-                  style={styles.checkbox}
+      {!noSessions && !isLoading && (
+        <div style={{ overflow: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {sessions.length > 0 && (
+            <SessionGroup label="班級今日場次">
+              {sessions.map((s) => (
+                <ClassRow
+                  key={s.sessionId}
+                  session={s}
+                  active={inWindow(s)}
+                  isChecked={selected.has(classKey(s.sessionId))}
+                  onToggle={() => onToggle(classKey(s.sessionId))}
                 />
-                <div style={styles.rowMain}>
-                  <div style={styles.rowTitle}>{s.className}</div>
-                  <div style={styles.rowMeta}>
-                    {s.startTime}–{s.endTime}
-                    {s.classroom ? ` · 教室 ${s.classroom}` : ''}
-                    {s.teacherId ? ` · 講師 ${s.teacherId}` : ''}
-                  </div>
-                </div>
-                {active && <span style={styles.activeBadge}>進行中</span>}
-              </li>
-            );
-          })}
-        </ul>
+              ))}
+            </SessionGroup>
+          )}
+
+          {courseSessions.length > 0 && (
+            <SessionGroup label="課程方案今日場次">
+              {courseSessions.map((s) => (
+                <CourseRow
+                  key={s.courseSessionId}
+                  session={s}
+                  active={inWindow(s)}
+                  isChecked={selected.has(courseKey(s.courseSessionId))}
+                  onToggle={() => onToggle(courseKey(s.courseSessionId))}
+                />
+              ))}
+            </SessionGroup>
+          )}
+        </div>
       )}
 
       <button
@@ -110,22 +127,110 @@ export function KioskSessionSelector({
   );
 }
 
+function SessionGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 style={styles.groupTitle}>{label}</h3>
+      <ul style={styles.list}>{children}</ul>
+    </div>
+  );
+}
+
+function ClassRow({
+  session, active, isChecked, onToggle,
+}: {
+  session: SessionDoc;
+  active: boolean;
+  isChecked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <li
+      style={{ ...styles.row, ...(isChecked ? styles.rowSelected : null) }}
+      onClick={onToggle}
+    >
+      <input
+        type="checkbox"
+        checked={isChecked}
+        onChange={onToggle}
+        onClick={(e) => e.stopPropagation()}
+        style={styles.checkbox}
+      />
+      <div style={styles.rowMain}>
+        <div style={styles.rowTitle}>{session.className}</div>
+        <div style={styles.rowMeta}>
+          {session.startTime}–{session.endTime}
+          {session.classroom ? ` · 教室 ${session.classroom}` : ''}
+          {session.teacherId ? ` · 講師 ${session.teacherId}` : ''}
+        </div>
+      </div>
+      {active && <span style={styles.activeBadge}>進行中</span>}
+    </li>
+  );
+}
+
+function CourseRow({
+  session, active, isChecked, onToggle,
+}: {
+  session: CourseSessionDoc;
+  active: boolean;
+  isChecked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <li
+      style={{ ...styles.row, ...(isChecked ? styles.rowSelected : null) }}
+      onClick={onToggle}
+    >
+      <input
+        type="checkbox"
+        checked={isChecked}
+        onChange={onToggle}
+        onClick={(e) => e.stopPropagation()}
+        style={styles.checkbox}
+      />
+      <div style={styles.rowMain}>
+        <div style={styles.rowTitle}>
+          <code style={{ fontSize: '0.95rem' }}>{session.courseSessionId}</code>
+          <span style={{ marginLeft: '0.5rem', color: '#cbd5e1' }}>
+            {session.courseId}{session.moduleId ? ` · ${session.moduleId}` : ''}
+          </span>
+        </div>
+        <div style={styles.rowMeta}>
+          {session.startTime}–{session.endTime}
+          {session.classroom ? ` · 教室 ${session.classroom}` : ''}
+          {session.instructorId ? ` · 講師 ${session.instructorId}` : ''}
+        </div>
+      </div>
+      {active && <span style={styles.activeBadge}>進行中</span>}
+    </li>
+  );
+}
+
 // 提供給上層計算「進行中」清單，用來預設勾選
-export function defaultSelectedSessionIds(
+export function defaultSelectedSessionKeys(
   sessions: SessionDoc[],
+  courseSessions: CourseSessionDoc[],
   openBefore = DEFAULT_OPEN_BEFORE,
   closeAfter = DEFAULT_CLOSE_AFTER,
 ): Set<string> {
   const nowMin = nowMinutes();
-  return new Set(
-    sessions
-      .filter((s) => {
-        const start = timeToMinutes(s.startTime);
-        const end = timeToMinutes(s.endTime);
-        return nowMin >= start - openBefore && nowMin <= end + closeAfter;
-      })
-      .map((s) => s.sessionId),
-  );
+  const result = new Set<string>();
+  for (const s of sessions) {
+    const start = timeToMinutes(s.startTime);
+    const end = timeToMinutes(s.endTime);
+    if (nowMin >= start - openBefore && nowMin <= end + closeAfter) {
+      result.add(classKey(s.sessionId));
+    }
+  }
+  for (const s of courseSessions) {
+    const start = timeToMinutes(s.startTime);
+    const end = timeToMinutes(s.endTime);
+    if (nowMin >= start - openBefore && nowMin <= end + closeAfter) {
+      result.add(courseKey(s.courseSessionId));
+    }
+  }
+  return result;
 }
 
 function nowMinutes(): number {
@@ -148,8 +253,12 @@ const styles: Record<string, React.CSSProperties> = {
   title: { margin: 0, fontSize: '1.5rem' },
   subtitle: { color: '#94a3b8', fontSize: '0.9rem', marginTop: '0.4rem', marginBottom: '1.25rem' },
   empty: { padding: '2rem', textAlign: 'center', color: '#cbd5e1' },
+  groupTitle: {
+    margin: '0 0 0.4rem', fontSize: '0.85rem', color: '#94a3b8',
+    fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px',
+  },
   list: {
-    listStyle: 'none', padding: 0, margin: 0, overflow: 'auto', flex: 1,
+    listStyle: 'none', padding: 0, margin: 0,
     border: '1px solid #334155', borderRadius: 8,
   },
   row: {

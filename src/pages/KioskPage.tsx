@@ -19,22 +19,28 @@ import { Link, useParams } from 'react-router-dom';
 
 import {
   KioskSessionSelector,
-  defaultSelectedSessionIds,
+  classKey,
+  courseKey,
+  defaultSelectedSessionKeys,
 } from '../components/KioskSessionSelector';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { useKioskCheckin } from '../hooks/useKioskCheckin';
 import {
   useBranchDayAttendanceRealtime,
+  useBranchDayCourseAttendanceRealtime,
+  useBranchDayCourseSessionsRealtime,
   useBranchDaySessionsRealtime,
 } from '../hooks/useRealtime';
 import { useWebcam } from '../hooks/useWebcam';
 import { ROUTES } from '../routes/paths';
 import { updateAttendance } from '../services/attendance';
+import { updateCourseAttendance } from '../services/courseAttendance';
 import { logFaceAttempt, deriveDeviceId } from '../services/faceCheckinAttempts';
 import { subscribeBranchSettings } from '../services/settings';
 import { decideManualCheckinStatus } from '../utils/attendance';
 import { makeRecordId } from '../types/attendance';
+import { courseAttendanceDocId } from '../types/courseAttendance';
 import { DEFAULT_BRANCH_SETTINGS, type BranchSettings } from '../types/settings';
 import { formatTimeWithSec, todayISO } from '../utils/date';
 
@@ -65,24 +71,32 @@ export function KioskPage() {
   const [match, setMatch] = useState<KioskMatch | null>(null);
   const [now, setNow] = useState(new Date());
 
-  // 已勾選的場次（Task 031）
+  // 已勾選的場次（complex key：'class:xxx' / 'course:xxx'）
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
   const today = todayISO();
   const todaySessionsRT = useBranchDaySessionsRealtime(branchId, today);
+  const todayCourseSessionsRT = useBranchDayCourseSessionsRealtime(branchId, today);
 
-  // 第一次載入完成、selected 還是空時，自動勾選「進行中」場次
+  // 第一次載入完成、selected 還是空時，自動勾選「進行中」場次（含課程方案）
   useEffect(() => {
-    if (todaySessionsRT.loading) return;
+    if (todaySessionsRT.loading || todayCourseSessionsRT.loading) return;
     if (selectedSessions.size > 0) return;
-    const defaults = defaultSelectedSessionIds(todaySessionsRT.data);
+    const defaults = defaultSelectedSessionKeys(
+      todaySessionsRT.data,
+      todayCourseSessionsRT.data,
+    );
     if (defaults.size > 0) setSelectedSessions(defaults);
-  }, [todaySessionsRT.loading, todaySessionsRT.data, selectedSessions.size]);
+  }, [
+    todaySessionsRT.loading, todaySessionsRT.data,
+    todayCourseSessionsRT.loading, todayCourseSessionsRT.data,
+    selectedSessions.size,
+  ]);
 
-  function toggleSession(sessionId: string) {
+  function toggleSession(sessionKey: string) {
     setSelectedSessions((prev) => {
       const next = new Set(prev);
-      if (next.has(sessionId)) next.delete(sessionId);
-      else next.add(sessionId);
+      if (next.has(sessionKey)) next.delete(sessionKey);
+      else next.add(sessionKey);
       return next;
     });
   }
@@ -104,26 +118,41 @@ export function KioskPage() {
     return unsub;
   }, [branchId]);
 
-  // 訂閱今日所有 attendance_records（給辨識迴圈算「比對範圍學生」用）
+  // 訂閱今日所有 attendance（班級 + 課程方案）給辨識迴圈與手動 fallback 用
   const attendanceRT = useBranchDayAttendanceRealtime(branchId, today);
+  const courseAttendanceRT = useBranchDayCourseAttendanceRealtime(branchId, today);
 
-  // === Task 040 manual fallback ===
-  // 從 selectedSessions × attendance_records 組出「尚未報到」候選名單。
-  const manualCandidates = (() => {
+  // === manual fallback 候選名單 — 班級 + 課程方案合併 ===
+  const manualCandidates: ManualCandidate[] = (() => {
     if (selectedSessions.size === 0) return [];
-    const list: Array<{
-      studentId: string; studentName: string; sessionId: string;
-      sessionLabel: string; status: string;
-    }> = [];
+    const list: ManualCandidate[] = [];
+    // 班級
     for (const r of attendanceRT.data) {
-      if (!selectedSessions.has(r.sessionId)) continue;
+      if (!selectedSessions.has(classKey(r.sessionId))) continue;
       if (r.status === 'CHECKED_IN' || r.status === 'LATE' || r.status === 'MAKEUP') continue;
       const session = todaySessionsRT.data.find((s) => s.sessionId === r.sessionId);
       list.push({
+        type: 'class',
         studentId: r.studentId,
         studentName: r.studentName,
-        sessionId: r.sessionId,
+        targetId: r.sessionId,
         sessionLabel: session ? `${session.className} ${session.startTime}` : r.sessionId,
+        status: r.status,
+      });
+    }
+    // 課程方案
+    for (const r of courseAttendanceRT.data) {
+      if (!selectedSessions.has(courseKey(r.courseSessionId))) continue;
+      if (r.status === 'CHECKED_IN' || r.status === 'LATE') continue;
+      const session = todayCourseSessionsRT.data.find((s) => s.courseSessionId === r.courseSessionId);
+      list.push({
+        type: 'course',
+        studentId: r.studentId,
+        studentName: r.studentName,
+        targetId: r.courseSessionId,
+        sessionLabel: session
+          ? `${session.courseSessionId} ${session.startTime}`
+          : r.courseSessionId,
         status: r.status,
       });
     }
@@ -139,26 +168,35 @@ export function KioskPage() {
     setState('READY');
   }
 
-  async function manualCheckin(c: { studentId: string; studentName: string; sessionId: string }) {
-    const session = todaySessionsRT.data.find((s) => s.sessionId === c.sessionId);
-    const status = session
-      ? decideManualCheckinStatus(
-          new Date(),
-          session.date,
-          session.startTime,
-          settings?.graceMinutes ?? DEFAULT_BRANCH_SETTINGS.graceMinutes,
-        )
-      : 'CHECKED_IN';
-    await updateAttendance(makeRecordId(c.sessionId, c.studentId), {
-      status,
-      method: 'MANUAL',
-      confidence: null,
-      operatorId: user?.userId ?? null,
-      setCheckinNow: true,
-    });
+  async function manualCheckin(c: ManualCandidate) {
+    if (c.type === 'class') {
+      const session = todaySessionsRT.data.find((s) => s.sessionId === c.targetId);
+      const status = session
+        ? decideManualCheckinStatus(
+            new Date(),
+            session.date,
+            session.startTime,
+            settings?.graceMinutes ?? DEFAULT_BRANCH_SETTINGS.graceMinutes,
+          )
+        : 'CHECKED_IN';
+      await updateAttendance(makeRecordId(c.targetId, c.studentId), {
+        status,
+        method: 'MANUAL',
+        confidence: null,
+        operatorId: user?.userId ?? null,
+        setCheckinNow: true,
+      });
+    } else {
+      // 課程方案沒有 graceMinutes 自動判定遲到 — 一律 CHECKED_IN
+      await updateCourseAttendance(courseAttendanceDocId(c.targetId, c.studentId), {
+        status: 'CHECKED_IN',
+        operatorId: user?.userId ?? null,
+        setCheckinNow: true,
+      });
+    }
     void logFaceAttempt({
       branchId: branchId ?? '',
-      sessionId: c.sessionId,
+      sessionId: c.type === 'class' ? c.targetId : null,
       deviceId: deriveDeviceId(),
       matchedStudentId: c.studentId,
       matchedStudentName: c.studentName,
@@ -184,6 +222,8 @@ export function KioskPage() {
     selectedSessions,
     todaySessions: todaySessionsRT.data,
     attendanceForToday: attendanceRT.data,
+    todayCourseSessions: todayCourseSessionsRT.data,
+    courseAttendanceForToday: courseAttendanceRT.data,
     setKioskState: setState,
     setMatch,
     graceMinutes: settings?.graceMinutes ?? DEFAULT_BRANCH_SETTINGS.graceMinutes,
@@ -271,9 +311,10 @@ export function KioskPage() {
 }
 
 interface ManualCandidate {
+  type: 'class' | 'course';
   studentId: string;
   studentName: string;
-  sessionId: string;
+  targetId: string;        // class: sessionId, course: courseSessionId
   sessionLabel: string;
   status: string;
 }
@@ -415,7 +456,7 @@ function ManualFallback({
   });
 
   async function handleCheckin(c: ManualCandidate) {
-    const key = `${c.sessionId}__${c.studentId}`;
+    const key = `${c.type}:${c.targetId}__${c.studentId}`;
     setBusyKey(key);
     try { await onCheckin(c); } finally { setBusyKey(null); }
   }
@@ -451,7 +492,7 @@ function ManualFallback({
             </li>
           )}
           {filtered.map((c) => {
-            const key = `${c.sessionId}__${c.studentId}`;
+            const key = `${c.type}:${c.targetId}__${c.studentId}`;
             return (
               <li
                 key={key}

@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { useWebcam } from './useWebcam';
+import { classKey, courseKey } from '../components/KioskSessionSelector';
 import { listActiveProfilesForStudents } from '../services/faceProfiles';
 import { logFaceAttempt, deriveDeviceId } from '../services/faceCheckinAttempts';
 import {
@@ -25,13 +26,17 @@ import {
   loadFaceModels,
 } from '../services/faceRecognition';
 import { updateAttendance } from '../services/attendance';
+import { updateCourseAttendance } from '../services/courseAttendance';
 import { decideManualCheckinStatus } from '../utils/attendance';
 import { makeRecordId } from '../types/attendance';
+import { courseAttendanceDocId } from '../types/courseAttendance';
 import { DEFAULT_BRANCH_SETTINGS } from '../types/settings';
 import type { KioskState, KioskMatch } from '../pages/KioskPage';
 import type { FaceProfileDoc } from '../types/faceProfile';
 import type { SessionDoc } from '../types/session';
 import type { AttendanceRecordDoc } from '../types/attendance';
+import type { CourseSessionDoc } from '../types/courseSession';
+import type { CourseAttendanceDoc } from '../types/courseAttendance';
 
 const SCAN_INTERVAL_MS = 1000;                // 兩次抓臉間隔
 const COOLDOWN_AFTER_SUCCESS_MS = 8000;       // 同學生 8 秒內不再次報到
@@ -56,9 +61,11 @@ interface UseKioskCheckinArgs {
   enabled: boolean;                           // 攝影機 ready + state in READY
   webcam: ReturnType<typeof useWebcam>;
   branchId: string;
-  selectedSessions: Set<string>;
+  selectedSessions: Set<string>;              // 'class:xxx' / 'course:xxx'
   todaySessions: SessionDoc[];
-  attendanceForToday: AttendanceRecordDoc[];  // 從 Kiosk 端的 realtime 訂閱來
+  attendanceForToday: AttendanceRecordDoc[];
+  todayCourseSessions: CourseSessionDoc[];
+  courseAttendanceForToday: CourseAttendanceDoc[];
   setKioskState: (s: KioskState) => void;
   setMatch: (m: KioskMatch | null) => void;
   graceMinutes: number;
@@ -122,19 +129,22 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
   const computeTargetStudentIds = useCallback((): string[] => {
     if (args.selectedSessions.size === 0) return [];
     const needsCheckin = new Set<string>();   // 仍需報到
-    const alreadyDone = new Set<string>();    // 已到（不重複觸發）
+    // 班級
     for (const r of args.attendanceForToday) {
-      if (!args.selectedSessions.has(r.sessionId)) continue;
+      if (!args.selectedSessions.has(classKey(r.sessionId))) continue;
       if (r.status === 'LEAVE' || r.status === 'CANCELLED') continue;
-      if (r.status === 'CHECKED_IN' || r.status === 'LATE' || r.status === 'MAKEUP') {
-        alreadyDone.add(r.studentId);
-      } else {
-        needsCheckin.add(r.studentId);
-      }
+      if (r.status === 'CHECKED_IN' || r.status === 'LATE' || r.status === 'MAKEUP') continue;
+      needsCheckin.add(r.studentId);
     }
-    // 一個學生若在 A 班已到、B 班還沒到，仍需要被比對 → 留在 needsCheckin
+    // 課程方案
+    for (const r of args.courseAttendanceForToday) {
+      if (!args.selectedSessions.has(courseKey(r.courseSessionId))) continue;
+      if (r.status === 'LEAVE') continue;
+      if (r.status === 'CHECKED_IN' || r.status === 'LATE') continue;
+      needsCheckin.add(r.studentId);
+    }
     return Array.from(needsCheckin);
-  }, [args.selectedSessions, args.attendanceForToday]);
+  }, [args.selectedSessions, args.attendanceForToday, args.courseAttendanceForToday]);
 
   // 3) 主流程：擷取一幀 → 偵測 → 匹配 → 寫 attendance
   const runOneScan = useCallback(async () => {
@@ -192,11 +202,18 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
         return;
       }
 
-      // 找該學生在 selectedSessions 裡的 attendance record
-      const ownRecords = args.attendanceForToday.filter(
-        (r) => r.studentId === best.profile.studentId && args.selectedSessions.has(r.sessionId),
+      // 找該學生在 selectedSessions 裡的 attendance records（班級 + 課程方案）
+      const ownClassRecords = args.attendanceForToday.filter(
+        (r) => r.studentId === best.profile.studentId
+          && args.selectedSessions.has(classKey(r.sessionId)),
       );
-      const primaryName = ownRecords[0]?.studentName ?? best.profile.studentId;
+      const ownCourseRecords = args.courseAttendanceForToday.filter(
+        (r) => r.studentId === best.profile.studentId
+          && args.selectedSessions.has(courseKey(r.courseSessionId)),
+      );
+      const primaryName = ownClassRecords[0]?.studentName
+        ?? ownCourseRecords[0]?.studentName
+        ?? best.profile.studentId;
 
       const matchInfo: KioskMatch = {
         studentId: best.profile.studentId,
@@ -225,11 +242,11 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
         args.setKioskState('READY');
         return;
       }
-      if (ownRecords.length === 0) {
+      if (ownClassRecords.length === 0 && ownCourseRecords.length === 0) {
         args.setKioskState('READY');
         return;
       }
-      for (const rec of ownRecords) {
+      for (const rec of ownClassRecords) {
         const session = args.todaySessions.find((s) => s.sessionId === rec.sessionId);
         const status = session
           ? decideManualCheckinStatus(new Date(), session.date, session.startTime, args.graceMinutes)
@@ -239,6 +256,14 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
           status,
           method: 'FACE',
           confidence: Number(best.confidence.toFixed(4)),
+          operatorId: args.operatorId,
+          setCheckinNow: true,
+        });
+      }
+      for (const rec of ownCourseRecords) {
+        // 課程方案沒有 graceMinutes 自動判定，一律 CHECKED_IN
+        await updateCourseAttendance(courseAttendanceDocId(rec.courseSessionId, rec.studentId), {
+          status: 'CHECKED_IN',
           operatorId: args.operatorId,
           setCheckinNow: true,
         });
@@ -282,16 +307,21 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
     };
   }, [args.enabled, runOneScan]);
 
-  // Task 039：CONFIRMING → 確認報到
+  // Task 039：CONFIRMING → 確認報到（班級 + 課程方案）
   const confirmMatch = useCallback(async (m: KioskMatch) => {
-    const ownRecords = args.attendanceForToday.filter(
-      (r) => r.studentId === m.studentId && args.selectedSessions.has(r.sessionId),
+    const ownClassRecords = args.attendanceForToday.filter(
+      (r) => r.studentId === m.studentId
+        && args.selectedSessions.has(classKey(r.sessionId)),
     );
-    if (ownRecords.length === 0) {
+    const ownCourseRecords = args.courseAttendanceForToday.filter(
+      (r) => r.studentId === m.studentId
+        && args.selectedSessions.has(courseKey(r.courseSessionId)),
+    );
+    if (ownClassRecords.length === 0 && ownCourseRecords.length === 0) {
       args.setKioskState('FAILED');
       return;
     }
-    for (const rec of ownRecords) {
+    for (const rec of ownClassRecords) {
       const session = args.todaySessions.find((s) => s.sessionId === rec.sessionId);
       const status = session
         ? decideManualCheckinStatus(new Date(), session.date, session.startTime, args.graceMinutes)
@@ -301,6 +331,13 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
         status,
         method: 'FACE',
         confidence: Number(m.confidence.toFixed(4)),
+        operatorId: args.operatorId,
+        setCheckinNow: true,
+      });
+    }
+    for (const rec of ownCourseRecords) {
+      await updateCourseAttendance(courseAttendanceDocId(rec.courseSessionId, rec.studentId), {
+        status: 'CHECKED_IN',
         operatorId: args.operatorId,
         setCheckinNow: true,
       });
