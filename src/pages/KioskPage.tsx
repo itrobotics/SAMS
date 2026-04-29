@@ -62,9 +62,12 @@ export interface KioskMatch {
 
 export function KioskPage() {
   const { branchId } = useParams<{ branchId: string }>();
-  const { branches } = useBranches();
+  const { branches, loading: branchesLoading } = useBranches();
   const { user } = useAuth();
-  const branchName = branches.find((b) => b.branchId === branchId)?.name ?? branchId;
+  const branch = branches.find((b) => b.branchId === branchId);
+  const branchName = branch?.name ?? branchId;
+  // branches 載入完成後若 branchId 不在清單裡，視為 URL 拼錯
+  const branchUnknown = !branchesLoading && branches.length > 0 && !branch;
 
   // 暫時的 demo 狀態 — Task 036 會把 setState 接上實際事件
   const [state, setState] = useState<KioskState>('IDLE');
@@ -248,13 +251,28 @@ export function KioskPage() {
     return () => clearTimeout(t);
   }, [state]);
 
+  // URL 上的 branchId 不在分校清單裡 → 直接擋下，列出可用 ID 給人挑
+  if (branchUnknown) {
+    return (
+      <UnknownBranch
+        branchId={branchId ?? ''}
+        branches={branches}
+      />
+    );
+  }
+
   return (
     <div style={styles.shell}>
       {/* 上方狀態列 */}
       <header style={styles.topbar}>
         <div>
           <span style={styles.brand}>SAMS Kiosk</span>
-          <span style={styles.branchName}>{branchName}</span>
+          <span style={styles.branchName}>
+            {branchName}
+            {branchId && (
+              <code style={styles.branchIdInline}>{branchId}</code>
+            )}
+          </span>
         </div>
         <div style={styles.clock}>{formatTimeWithSec(now)}</div>
         <Link to={ROUTES.branches} style={styles.exitBtn}>
@@ -317,6 +335,76 @@ interface ManualCandidate {
   targetId: string;        // class: sessionId, course: courseSessionId
   sessionLabel: string;
   status: string;
+}
+
+// URL 的 branchId 不存在於 branches 集合 → 顯示錯誤頁，列出可用 ID
+function UnknownBranch({
+  branchId, branches,
+}: {
+  branchId: string;
+  branches: Array<{ branchId: string; name: string }>;
+}) {
+  return (
+    <div style={styles.shell}>
+      <header style={styles.topbar}>
+        <span style={styles.brand}>SAMS Kiosk</span>
+        <Link to={ROUTES.branches} style={styles.exitBtn}>結束</Link>
+      </header>
+      <main style={styles.main}>
+        <div style={styles.center}>
+          <div style={{
+            background: '#1e293b', color: '#f1f5f9',
+            padding: '2.5rem 3rem', borderRadius: 16,
+            width: 'min(560px, 92vw)', boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+          }}>
+            <div style={{ fontSize: '4rem', textAlign: 'center', marginBottom: '0.75rem' }}>⚠️</div>
+            <h2 style={{ margin: 0, fontSize: '1.4rem', textAlign: 'center' }}>
+              找不到分校 <code style={{ background: '#0f172a', padding: '0.1rem 0.45rem', borderRadius: 4 }}>{branchId}</code>
+            </h2>
+            <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginTop: '0.85rem', textAlign: 'center' }}>
+              請確認 URL 上的分校代碼是否正確（大小寫、拼法）。
+            </p>
+
+            {branches.length > 0 ? (
+              <>
+                <p style={{ color: '#cbd5e1', fontSize: '0.9rem', marginTop: '1.25rem', marginBottom: '0.5rem' }}>
+                  可用分校：
+                </p>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  {branches.map((b) => (
+                    <li key={b.branchId} style={{
+                      padding: '0.55rem 0.75rem', borderTop: '1px solid #334155',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    }}>
+                      <span>
+                        <span style={{ fontSize: '1rem' }}>{b.name}</span>
+                        <code style={{
+                          marginLeft: '0.5rem', color: '#94a3b8', fontSize: '0.85rem',
+                        }}>{b.branchId}</code>
+                      </span>
+                      <Link
+                        to={ROUTES.kiosk(b.branchId)}
+                        style={{
+                          padding: '0.35rem 0.7rem', background: '#2563eb', color: '#fff',
+                          borderRadius: 6, fontSize: '0.85rem', textDecoration: 'none',
+                        }}
+                      >
+                        進入 →
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p style={{ color: '#fca5a5', fontSize: '0.9rem', marginTop: '1rem', textAlign: 'center' }}>
+                目前帳號沒有任何分校權限。
+              </p>
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
 }
 
 function Stage({
@@ -611,6 +699,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   brand: { fontWeight: 700, fontSize: '1rem', letterSpacing: 1 },
   branchName: { marginLeft: '0.75rem', color: '#94a3b8', fontSize: '0.95rem' },
+  branchIdInline: {
+    marginLeft: '0.45rem', padding: '0.05rem 0.4rem',
+    background: '#0f172a', borderRadius: 4,
+    color: '#64748b', fontSize: '0.78rem',
+  },
   clock: { fontVariantNumeric: 'tabular-nums', fontSize: '1.05rem', color: '#cbd5e1' },
   exitBtn: {
     padding: '0.4rem 0.85rem',

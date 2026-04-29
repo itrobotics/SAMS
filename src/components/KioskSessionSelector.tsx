@@ -72,10 +72,18 @@ export function KioskSessionSelector({
       {isLoading && <div style={styles.empty}>載入今日場次…</div>}
       {noSessions && (
         <div style={styles.empty}>
-          <p>今日 {today} 尚無場次。</p>
-          <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
+          <p style={{ marginBottom: '0.4rem' }}>查無場次</p>
+          <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0 0 0.85rem' }}>
+            <code style={styles.queryCode}>branchId={branchId}</code>
+            {' · '}
+            <code style={styles.queryCode}>date={today}</code>
+          </p>
+          <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>
             班級：請至「設定 → 每日場次產生」建立。<br />
-            課程方案：請至「課程方案 → 單元」開啟報到。
+            課程方案：請至「課程方案 → 單元」對某個 slot 點「開啟報到」。
+          </p>
+          <p style={{ color: '#64748b', fontSize: '0.78rem', marginTop: '0.85rem' }}>
+            若場次的日期 / 分校與上方條件不一致，將不會出現於此清單。
           </p>
         </div>
       )}
@@ -253,6 +261,10 @@ const styles: Record<string, React.CSSProperties> = {
   title: { margin: 0, fontSize: '1.5rem' },
   subtitle: { color: '#94a3b8', fontSize: '0.9rem', marginTop: '0.4rem', marginBottom: '1.25rem' },
   empty: { padding: '2rem', textAlign: 'center', color: '#cbd5e1' },
+  queryCode: {
+    background: '#0f172a', padding: '0.1rem 0.4rem', borderRadius: 4,
+    fontSize: '0.78rem', color: '#cbd5e1',
+  },
   groupTitle: {
     margin: '0 0 0.4rem', fontSize: '0.85rem', color: '#94a3b8',
     fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px',
