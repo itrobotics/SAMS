@@ -1,17 +1,32 @@
-// students collection 型別定義（Task 011）
-//
-// Firestore 路徑：`students/{studentId}`，studentId 為人工指定的學號
-// （如 "S001"）。grade 採文字（如 "小三", "國一"），不強迫枚舉以保彈性。
+// students collection 型別定義
 
 import type { Timestamp } from 'firebase/firestore';
+
+export type Gender = 'male' | 'female' | 'other';
+export const GENDER_LABELS: Record<Gender, string> = { male: '男', female: '女', other: '其他' };
 
 export interface StudentDoc {
   studentId: string;
   branchId: string;
   name: string;
+  gender: Gender;
+  birthday: string;        // "YYYY-MM-DD" or ""
   grade: string;
   parentName: string;
   parentPhone: string;
+  // 通訊地址
+  mailingCity: string;
+  mailingDistrict: string;
+  mailingAddress: string;
+  // 戶籍地址
+  registeredAddressSameAsMailing: boolean;
+  registeredCity: string;
+  registeredDistrict: string;
+  registeredAddress: string;
+  // 緊急聯絡人
+  emergencyContactName: string;
+  emergencyContactRelation: string;
+  notes: string;
   active: boolean;
   createdAt?: Timestamp;
 }
@@ -20,23 +35,46 @@ export interface NewStudentInput {
   studentId: string;
   branchId: string;
   name: string;
+  gender?: Gender;
+  birthday?: string;
   grade?: string;
   parentName?: string;
   parentPhone?: string;
+  mailingCity?: string;
+  mailingDistrict?: string;
+  mailingAddress?: string;
+  registeredAddressSameAsMailing?: boolean;
+  registeredCity?: string;
+  registeredDistrict?: string;
+  registeredAddress?: string;
+  emergencyContactName?: string;
+  emergencyContactRelation?: string;
+  notes?: string;
 }
 
 export interface UpdateStudentInput {
   branchId?: string;
   name?: string;
+  gender?: Gender;
+  birthday?: string;
   grade?: string;
   parentName?: string;
   parentPhone?: string;
+  mailingCity?: string;
+  mailingDistrict?: string;
+  mailingAddress?: string;
+  registeredAddressSameAsMailing?: boolean;
+  registeredCity?: string;
+  registeredDistrict?: string;
+  registeredAddress?: string;
+  emergencyContactName?: string;
+  emergencyContactRelation?: string;
+  notes?: string;
   active?: boolean;
 }
 
 export const STUDENTS_COLLECTION = 'students';
 
-// 學號允許英數與底線、連字號，2-30 字元；不限制大小寫以保留 "S001" 寫法
 const STUDENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{1,29}$/;
 
 export function isValidStudentId(id: string): boolean {
