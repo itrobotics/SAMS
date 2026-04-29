@@ -41,6 +41,7 @@ export interface CourseAttendanceDoc {
   courseId: string;
   moduleId: string;
   branchId: string;
+  date: string;             // YYYY-MM-DD（denormalize 自場次，方便 dashboard 用 branchId+date 查）
   studentId: string;
   studentName: string;
   status: CourseAttendanceStatus;

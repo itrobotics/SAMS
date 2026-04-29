@@ -83,6 +83,49 @@ export function subscribeCourseSessions(
   );
 }
 
+// 分校 dashboard 用：某分校 + 某日的所有課程方案場次
+interface SubscribeCourseSessionsForBranchDateOptions {
+  branchId: string;
+  date: string;
+}
+export function subscribeCourseSessionsForBranchDate(
+  { branchId, date }: SubscribeCourseSessionsForBranchDateOptions,
+  onChange: (list: CourseSessionDoc[]) => void,
+  onError?: (e: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(db, COURSE_SESSIONS_COLLECTION),
+    where('branchId', '==', branchId),
+    where('date', '==', date),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      const list = snap.docs.map(snapshotToCS);
+      list.sort((a, b) => a.startTime.localeCompare(b.startTime));
+      onChange(list);
+    },
+    (err) => onError?.(err),
+  );
+}
+
+// HQ dashboard 用：某日跨分校的所有課程方案場次
+export function subscribeAllCourseSessionsForDate(
+  date: string,
+  onChange: (list: CourseSessionDoc[]) => void,
+  onError?: (e: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(db, COURSE_SESSIONS_COLLECTION),
+    where('date', '==', date),
+  );
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map(snapshotToCS)),
+    (err) => onError?.(err),
+  );
+}
+
 // 從某 module 的某 slot 開啟場次（主要入口）
 //   1) 找 module 上指定 slot（依 date + startTime 比對）
 //   2) 檢查是否已開啟過（同 courseId + moduleId + date + startTime）
@@ -116,7 +159,7 @@ export async function openCourseSessionFromSlot(
     notes: '',
   });
 
-  await materializeAttendance(courseSessionId, module.courseId, module.moduleId, module.branchId);
+  await materializeAttendance(courseSessionId, module.courseId, module.moduleId, module.branchId, slot.date);
   return courseSessionId;
 }
 
@@ -165,15 +208,17 @@ export async function createCourseSession(input: NewCourseSessionInput): Promise
     notes: input.notes?.trim() ?? '',
   });
 
-  await materializeAttendance(input.courseSessionId, input.courseId, input.moduleId ?? '', input.branchId);
+  await materializeAttendance(input.courseSessionId, input.courseId, input.moduleId ?? '', input.branchId, input.date);
 }
 
 // 內部共用：依 active enrollments 物化某場次的 course_attendance（status='SCHEDULED'）
+// date 同時 denormalize 進 attendance 文件，dashboard 可用 branchId+date 一次撈
 async function materializeAttendance(
   courseSessionId: string,
   courseId: string,
   moduleId: string,
   branchId: string,
+  date: string,
 ): Promise<void> {
   const enrollSnap = await getDocs(
     query(
@@ -195,6 +240,7 @@ async function materializeAttendance(
       courseId,
       moduleId,
       branchId,
+      date,
       studentId: en.studentId,
       studentName: en.studentName,
       status: 'SCHEDULED',

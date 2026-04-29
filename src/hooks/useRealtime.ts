@@ -16,8 +16,12 @@ import {
   subscribeAttendanceForSession,
 } from '../services/attendance';
 import { subscribeSession, subscribeSessionsForBranchDate } from '../services/sessions';
+import { subscribeCourseSessionsForBranchDate } from '../services/courseSessions';
+import { subscribeCourseAttendanceForBranchDate } from '../services/courseAttendance';
 import type { AttendanceRecordDoc } from '../types/attendance';
 import type { SessionDoc } from '../types/session';
+import type { CourseSessionDoc } from '../types/courseSession';
+import type { CourseAttendanceDoc } from '../types/courseAttendance';
 
 interface RealtimeState<T> {
   data: T;
@@ -103,6 +107,28 @@ export function useBranchDayAttendanceRealtime(branchId: string | undefined, dat
   return useRealtime<AttendanceRecordDoc[]>(
     () => (branchId
       ? (onChange, onError) => subscribeAttendanceForBranchDate(branchId, date, onChange, onError)
+      : null),
+    [],
+    [branchId, date],
+  );
+}
+
+// 課程方案：某分校某日的場次清單
+export function useBranchDayCourseSessionsRealtime(branchId: string | undefined, date: string) {
+  return useRealtime<CourseSessionDoc[]>(
+    () => (branchId
+      ? (onChange, onError) => subscribeCourseSessionsForBranchDate({ branchId, date }, onChange, onError)
+      : null),
+    [],
+    [branchId, date],
+  );
+}
+
+// 課程方案：某分校某日的出席紀錄
+export function useBranchDayCourseAttendanceRealtime(branchId: string | undefined, date: string) {
+  return useRealtime<CourseAttendanceDoc[]>(
+    () => (branchId
+      ? (onChange, onError) => subscribeCourseAttendanceForBranchDate(branchId, date, onChange, onError)
       : null),
     [],
     [branchId, date],

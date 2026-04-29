@@ -21,16 +21,21 @@ import { useAuth } from '../hooks/useAuth';
 import { subscribeBranches } from '../services/branches';
 import { subscribeAllAttendanceForDate } from '../services/attendance';
 import { subscribeAllSessionsForDate } from '../services/sessions';
+import { subscribeAllCourseSessionsForDate } from '../services/courseSessions';
+import { subscribeAllCourseAttendanceForDate } from '../services/courseAttendance';
 import { ROUTES } from '../routes/paths';
 import { todayISO } from '../utils/date';
 import type { BranchDoc } from '../types/branch';
 import type { SessionDoc } from '../types/session';
 import type { AttendanceRecordDoc, AttendanceStatus } from '../types/attendance';
+import type { CourseSessionDoc } from '../types/courseSession';
+import type { CourseAttendanceDoc, CourseAttendanceStatus } from '../types/courseAttendance';
 
 interface BranchRow {
   branch: BranchDoc;
-  classCount: number;
-  total: number;       // 應到
+  classCount: number;          // 班級場次數
+  courseSessionCount: number;  // 課程方案場次數
+  total: number;       // 應到（班級+課程方案合計）
   checkedIn: number;   // CHECKED_IN
   late: number;        // LATE
   leave: number;       // LEAVE
@@ -42,6 +47,7 @@ interface BranchRow {
 const EMPTY_ROW = (b: BranchDoc): BranchRow => ({
   branch: b,
   classCount: 0,
+  courseSessionCount: 0,
   total: 0,
   checkedIn: 0,
   late: 0,
@@ -58,6 +64,8 @@ export function HQDashboardPage() {
   const [branches, setBranches] = useState<BranchDoc[]>([]);
   const [sessions, setSessions] = useState<SessionDoc[]>([]);
   const [records, setRecords] = useState<AttendanceRecordDoc[]>([]);
+  const [courseSessions, setCourseSessions] = useState<CourseSessionDoc[]>([]);
+  const [courseAttendance, setCourseAttendance] = useState<CourseAttendanceDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,7 +80,18 @@ export function HQDashboardPage() {
     return subscribeAllAttendanceForDate(date, setRecords, (e) => setError(e.message));
   }, [date]);
 
-  const rows = useMemo(() => buildRows(branches, sessions, records), [branches, sessions, records]);
+  useEffect(() => {
+    return subscribeAllCourseSessionsForDate(date, setCourseSessions, (e) => setError(e.message));
+  }, [date]);
+
+  useEffect(() => {
+    return subscribeAllCourseAttendanceForDate(date, setCourseAttendance, (e) => setError(e.message));
+  }, [date]);
+
+  const rows = useMemo(
+    () => buildRows(branches, sessions, records, courseSessions, courseAttendance),
+    [branches, sessions, records, courseSessions, courseAttendance],
+  );
   const totals = useMemo(() => sumRows(rows), [rows]);
 
   // 非 HQ 不該看到此頁；保險導回 login（AuthGuard 不會擋）
@@ -110,7 +129,11 @@ export function HQDashboardPage() {
       {error && <div style={styles.error}>{error}</div>}
 
       <div style={styles.summary}>
-        <SummaryCard label="今日班級總數" value={totals.classCount} accent="#1f2937" />
+        <SummaryCard
+          label="今日場次總數"
+          value={totals.classCount + totals.courseSessionCount}
+          accent="#1f2937"
+        />
         <SummaryCard label="應到" value={totals.total} accent="#374151" />
         <SummaryCard label="已到" value={totals.checkedIn + totals.late} accent="#166534" />
         <SummaryCard label="遲到" value={totals.late} accent="#92400e" />
@@ -131,6 +154,7 @@ export function HQDashboardPage() {
             <tr>
               <th style={styles.th}>分校</th>
               <th style={styles.thNum}>今日班級</th>
+              <th style={styles.thNum}>課程方案</th>
               <th style={styles.thNum}>應到</th>
               <th style={styles.thNum}>已到</th>
               <th style={styles.thNum}>遲到</th>
@@ -143,7 +167,7 @@ export function HQDashboardPage() {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={9} style={styles.empty}>尚無分校資料</td>
+                <td colSpan={10} style={styles.empty}>尚無分校資料</td>
               </tr>
             )}
             {rows.map((r) => (
@@ -166,6 +190,7 @@ export function HQDashboardPage() {
                   </div>
                 </td>
                 <td style={styles.tdNum}>{r.classCount}</td>
+                <td style={styles.tdNum}>{r.courseSessionCount}</td>
                 <td style={styles.tdNum}>{r.total}</td>
                 <td style={{ ...styles.tdNum, color: '#166534' }}>{r.checkedIn + r.late}</td>
                 <td style={{ ...styles.tdNum, color: '#92400e' }}>{r.late}</td>
@@ -198,22 +223,38 @@ function buildRows(
   branches: BranchDoc[],
   sessions: SessionDoc[],
   records: AttendanceRecordDoc[],
+  courseSessions: CourseSessionDoc[],
+  courseAttendance: CourseAttendanceDoc[],
 ): BranchRow[] {
   const map = new Map<string, BranchRow>();
   for (const b of branches) map.set(b.branchId, EMPTY_ROW(b));
 
-  // 班級數：每個 branch 的 sessions count
+  // 班級場次數
   for (const s of sessions) {
     const row = map.get(s.branchId);
     if (row) row.classCount += 1;
   }
 
-  // 應到 / 已到 / etc.
+  // 課程方案場次數
+  for (const s of courseSessions) {
+    const row = map.get(s.branchId);
+    if (row) row.courseSessionCount += 1;
+  }
+
+  // 班級出席統計
   for (const r of records) {
     const row = map.get(r.branchId);
     if (!row) continue;
     row.total += 1;
     bump(row, r.status);
+  }
+
+  // 課程方案出席統計（合併進同一 row）
+  for (const r of courseAttendance) {
+    const row = map.get(r.branchId);
+    if (!row) continue;
+    row.total += 1;
+    bumpCourse(row, r.status);
   }
 
   // 到班率
@@ -225,7 +266,6 @@ function buildRows(
     }
   }
 
-  // 排序：到班率高的在前；同分數按名稱
   return Array.from(map.values()).sort((a, b) => {
     if (b.attendanceRate !== a.attendanceRate) return b.attendanceRate - a.attendanceRate;
     return a.branch.name.localeCompare(b.branch.name);
@@ -244,8 +284,19 @@ function bump(row: BranchRow, status: AttendanceStatus): void {
   }
 }
 
+function bumpCourse(row: BranchRow, status: CourseAttendanceStatus): void {
+  switch (status) {
+    case 'CHECKED_IN': row.checkedIn += 1; break;
+    case 'LATE':       row.late += 1; break;
+    case 'LEAVE':      row.leave += 1; break;
+    case 'ABSENT':     row.absent += 1; break;
+    case 'SCHEDULED':  row.scheduled += 1; break;
+  }
+}
+
 interface Totals {
   classCount: number;
+  courseSessionCount: number;
   total: number;
   checkedIn: number;
   late: number;
@@ -257,10 +308,11 @@ interface Totals {
 
 function sumRows(rows: BranchRow[]): Totals {
   const t: Totals = {
-    classCount: 0, total: 0, checkedIn: 0, late: 0, leave: 0, absent: 0, scheduled: 0, attendanceRate: 0,
+    classCount: 0, courseSessionCount: 0, total: 0, checkedIn: 0, late: 0, leave: 0, absent: 0, scheduled: 0, attendanceRate: 0,
   };
   for (const r of rows) {
     t.classCount += r.classCount;
+    t.courseSessionCount += r.courseSessionCount;
     t.total += r.total;
     t.checkedIn += r.checkedIn;
     t.late += r.late;

@@ -62,6 +62,43 @@ export function subscribeCourseAttendanceForCourse(
   );
 }
 
+// 分校 dashboard 用：某分校 + 某日的所有課程方案出席紀錄
+// 依賴 course_attendance.date 已 denormalize（openCourseSessionFromSlot 寫入時帶）
+export function subscribeCourseAttendanceForBranchDate(
+  branchId: string,
+  date: string,
+  onChange: (list: CourseAttendanceDoc[]) => void,
+  onError?: (e: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(db, COURSE_ATTENDANCE_COLLECTION),
+    where('branchId', '==', branchId),
+    where('date', '==', date),
+  );
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map(snapshotToRec)),
+    (err) => onError?.(err),
+  );
+}
+
+// HQ dashboard 用：某日跨分校所有課程方案出席紀錄
+export function subscribeAllCourseAttendanceForDate(
+  date: string,
+  onChange: (list: CourseAttendanceDoc[]) => void,
+  onError?: (e: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(db, COURSE_ATTENDANCE_COLLECTION),
+    where('date', '==', date),
+  );
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map(snapshotToRec)),
+    (err) => onError?.(err),
+  );
+}
+
 interface UpdateCourseAttendanceInput {
   status: CourseAttendanceStatus;
   operatorId?: string | null;
