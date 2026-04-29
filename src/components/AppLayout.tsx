@@ -31,6 +31,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { to: '/branches', label: '分校', show: true },
     { to: ROUTES.students, label: '學生', show: true },
     { to: ROUTES.classes, label: '班級', show: true },
+    { to: ROUTES.classPricing, label: '定價表', show: isHQ || isBranchAdmin },
     { to: ROUTES.courses, label: '課程方案', show: isHQ || isBranchAdmin || isTeacher },
     { to: ROUTES.instructors, label: '講師', show: true },
     { to: ROUTES.instructorSchedule, label: '排課清單', show: true },

@@ -943,6 +943,271 @@ active face_profiles
 
 ---
 
+# Phase 16｜MVP 後續優化
+
+## 目標
+
+MVP 主流程上線後逐步加入的營運與管理輔助功能。涵蓋共用基礎（自動代碼、選項管理、台灣地址）、主檔資料擴充（講師 / 學生 / 分校 / 班級）、進階模組（定價表、講師排課清單、期間 filter 統一）。
+
+開發順序與 commit 上的 Task 編號一致（Task 045 ~ Task 066）。本 phase 與排課 / 報到主流程獨立，可分階段交付。
+
+> 本 phase 期間另有數筆未編號的修補 commit（如「strip undefined meeting fields」、「add Firestore rules for instructors and app_options」、「support multiple meetings per class with per-meeting overrides」），不另列為 Task。
+
+## Tasks
+
+### Task 045｜建立 app_options collection 與選項管理頁
+
+新增 `app_options` collection 作為共用下拉選單來源；每個 doc 代表一類選項。
+
+```ts
+{
+  key: string,            // doc ID（如 'courses'）
+  label: string,
+  values: string[],
+  updatedAt: timestamp
+}
+```
+
+預設 doc：
+
+- `courses` — 講師可教授課程
+- `relationships` — 緊急聯絡人關係
+
+新頁面 `/options`（HQ Admin 限定），可新增 / 刪除 / 排序選項。
+
+---
+
+### Task 046｜建立講師管理 CRUD
+
+新增 `instructors` collection 與 `/instructors` 頁面。欄位：基本資料 / 學歷 / 聯絡方式 / 緊急聯絡人 / 鐘點 / 累計教學時數。
+
+`instructorId` 採 `Tnnn` 流水號自動產生（透過 Task 047 的 helper）。
+
+---
+
+### Task 047｜自動產生主檔代碼
+
+新增 `src/utils/autoId.ts`：掃 collection 找最大 `${prefix}\d+` 後 +1，補零至 3 位。
+
+`studentId` / `classId` / `instructorId` 新增時自動帶入；使用者仍可改。
+
+---
+
+### Task 048｜班級列表顯示學生人數
+
+新增 `fetchAllActiveClassStudentCounts(): Promise<Map<string, number>>`，aggregate `class_students` 啟用人數。
+
+ClassesPage 一次性 fetch（非訂閱）並在每列顯示「學生人數」。
+
+---
+
+### Task 049｜支援跨分校加入學生
+
+班級學生管理頁加分校 filter（HQ 預設「全部分校」），移除原本「只能加同分校學生」的限制。`class_students.branchId` 仍寫入，方便日後 server-side 隔離。
+
+---
+
+### Task 050｜講師擴充欄位
+
+加入：性別、通訊地址（縣市 / 區 / 詳址分離）、戶籍地址（含「同通訊」勾選）、鐘點 `hourlyRate`、累計教學時數 `totalTeachingHours`、備註。
+
+---
+
+### Task 051｜學生編輯支援永久刪除
+
+`StudentFormDialog` 加紅色「刪除」按鈕（雙確認）；同時清掉該學生的 `class_students` 關聯。
+
+---
+
+### Task 052｜app_options 加 courseTypes
+
+`app_options` 新增 `courseTypes` doc，預設 19 種課程類型（micro:bit / 科學實驗 / MPM / Scratch …）。`OPTION_LABELS.courseTypes = '課程類型（班級）'`。
+
+---
+
+### Task 053｜班級表單改用講師下拉與課程類型下拉
+
+`ClassFormDialog` 移除 `teacherId` 文字輸入，改 `subscribeInstructors({ activeOnly: true })` 下拉；課程類型也改下拉（讀 `app_options.courseTypes`）。
+
+---
+
+### Task 054｜台灣縣市行政區資料與 TaiwanAddressFields component
+
+- 新增 `src/utils/taiwanAddress.ts` — 縣市 → 區陣列查表
+- 新增 `src/components/TaiwanAddressFields.tsx` — 共用元件，給 student / instructor 表單用
+
+---
+
+### Task 055｜班級列表顯示「T001-Joseph」格式
+
+ClassesPage 用 instructor map 顯示「ID-姓名」，未指定講師則「—」。
+
+---
+
+### Task 056｜學生擴充欄位
+
+加入：性別、生日、通訊地址（縣市 / 區 / 詳址）、戶籍地址（含「同通訊」勾選）、緊急聯絡人（姓名 + 關係）、備註。改用 `<TaiwanAddressFields>`。
+
+---
+
+### Task 057｜講師加生日 + 行政區欄位
+
+instructors 加 `birthday`；地址改用 `<TaiwanAddressFields>`（縣市 / 區 / 詳址三段）。
+
+---
+
+### Task 058｜班級加課程起訖日 / 時數 / 新增模式啟用 toggle
+
+`ClassDoc` 加：
+
+- `courseStartDate: 'YYYY-MM-DD'`
+- `courseEndDate: 'YYYY-MM-DD'`
+- `courseHours: number`
+
+`ClassFormDialog` 新增模式也顯示「啟用」checkbox（先前只有編輯模式）。
+
+---
+
+### Task 059｜班級時段顯示優化
+
+班級列表 meeting 顯示為「週二 18:00–18:30（講師 T003 matt | 教室 101）」。即時 join `instructors` 與 meeting override，可一眼看出每個時段的負責講師與教室。
+
+> 註：早期 task breakdown 把 Task 059 標為「MVP 上線檢查表」（見上），實際開發時 Task 059 編號被用在這個 UI 改動。檢查表項目仍適用於 MVP 上線，但未做為單一 commit。
+
+---
+
+### Task 060｜班級欄位改名與多重 filter
+
+- 「老師」→「上課講師」（單一班級可多講師）
+- ClassesPage 加：期間 filter / 講師代碼或姓名搜尋
+- `formatTeachers()` 列出該班所有講師（預設 `teacherId` + 各 meeting `teacherId` override，去重）
+
+---
+
+### Task 061｜講師排課清單頁
+
+新頁面 `/instructor-schedule`：列出某講師被排在哪些班級的哪些時段（預設 + meeting override）。篩選：講師 / 期間 / 啟用狀態。
+
+---
+
+### Task 062｜全 UI 將「老師」改為「講師」
+
+全域 string replace（UI label / 註解 / hint），底層欄位名 `teacherId` 不動以維持 schema 穩定。
+
+---
+
+### Task 063｜分校加客服電話、主任資訊、備註欄位
+
+`branches` 加：
+
+```ts
+{
+  servicePhone: string,    // 客服電話
+  directorName: string,    // 主任姓名
+  directorPhone: string,   // 主任手機
+  directorLineId: string,  // 主任 Line ID
+  notes: string            // 備註
+}
+```
+
+---
+
+### Task 064｜分校列表顯示 servicePhone 與 directorName
+
+BranchesPage 新增兩欄，方便分校頁一眼看出聯絡資訊。
+
+---
+
+### Task 065｜建立班級定價表模組
+
+對應產品 spec **M13 班級定價表模組**。
+
+新增檔案：
+
+- `src/types/classPricing.ts` — `ClassPricingDoc` 型別、`PriceType` 列舉
+- `src/services/classPricing.ts` — Firestore CRUD + `subscribeClassPricing({ branchIds, classId?, activeOnly? })`，內建 6 位 `PRnnnnnn` 流水號產生器
+- `src/components/ClassPricingFormDialog.tsx` — 新增 / 編輯表單
+- `src/pages/ClassPricingPage.tsx` — 列表 + 篩選 + 預估營收
+
+修改檔案：
+
+- `src/routes/paths.ts` — 加入 `classPricing: '/class-pricing'`
+- `src/routes/AppRouter.tsx` — 註冊路由
+- `src/components/AppLayout.tsx` — 導覽列加「定價表」（HQ Admin / Branch Admin 可見）
+- `firestore.rules` — 加入 `class_pricing` collection 規則（沿用「登入即可讀寫」）
+
+#### Firestore：`class_pricing`
+
+```ts
+{
+  pricingId: string,                                       // 自動產生 PRnnnnnn
+  classId: string,
+  branchId: string,
+  className: string,                                        // denormalized
+  price: number,                                            // TWD，每人費用
+  priceType: 'per_class' | 'per_month' | 'per_session',
+  notes: string,
+  active: boolean,
+  createdAt: timestamp,
+  createdBy: string
+}
+```
+
+#### 計費方式
+
+- **per_class — 每班次**：整個班次（一期）一筆費用
+- **per_month — 每月**：每人每月收費
+- **per_session — 每堂**：每人每堂收費
+
+#### 列表欄位
+
+| 班級名稱 | 分校 | 定價/人 | 計費方式 | 目前人數 | 預估營收 | 狀態 | 操作 |
+
+- 預估營收 = `price × class_students.active 人數`（client 端計算）
+- header 顯示「啟用中預估營收合計 NT$ ...」
+
+#### 篩選
+
+- 分校（角色過濾後）
+- 班級名稱（client 端 substring）
+- 啟用狀態：啟用中（預設）/ 已停用 / 全部
+
+#### 設計決策
+
+- 同一 classId 可有多筆定價（例如優惠價、舊價、不同方案）；不以「生效期間」區分，改以 `active` 控制是否納入估算
+- `className` denormalized，列表免再 join classes
+- `pricingId` 用 6 位流水號（`autoId.ts` 只支援 3 位，service 內建獨立生成器）
+
+---
+
+### Task 066｜統一班級期間 Filter
+
+#### 動機
+
+ClassesPage 與 InstructorSchedulePage 原本各自實作「今日 / 本週 / 本月 / 上月 / 下月 / 自訂期間」加上自訂日期區間 UI；經實際使用後改為 6 個固定 preset，邏輯改成「指定欄位的月 / 季是否落在某個月 / 季」。
+
+#### 期間選項（兩頁共用）
+
+| 選項 | 規則 |
+|---|---|
+| 全部（預設） | 不過濾 |
+| 本月開課 | 月(`courseStartDate`) === 本月 |
+| 本月結束 | 月(`courseEndDate`) === 本月 |
+| 上月開課 | 月(`courseStartDate`) === 上月 |
+| 下月結束 | 月(`courseEndDate`) === 下月 |
+| 本季開課 | 季(`courseStartDate`) === 本季 |
+| 本季結束 | 季(`courseEndDate`) === 本季 |
+
+> 季：1-3 月 = Q1，4-6 月 = Q2，7-9 月 = Q3，10-12 月 = Q4。
+> 未填對應日期的班級在非「全部」preset 下會被排除。
+
+#### 新增 / 修改檔案
+
+- 新增 `src/utils/coursePeriodFilter.ts` — `CoursePeriodPreset` 型別、`COURSE_PERIOD_OPTIONS` 陣列、`matchesCoursePeriod(preset, courseStartDate, courseEndDate, now?)`
+- 修改 `src/pages/ClassesPage.tsx` 與 `src/pages/InstructorSchedulePage.tsx`：移除舊 `getPresetRange` / `overlapsPeriod` / 自訂日期區間 UI，改用共用 util
+
+---
+
 # 建議開發順序總表
 
 | Phase | 名稱 | 優先度 |
@@ -963,6 +1228,7 @@ active face_profiles
 | Phase 13 | 報表分析 | P2 |
 | Phase 14 | 系統設定 | P2 |
 | Phase 15 | 測試與上線 | P0 |
+| Phase 16 | MVP 後續優化（Task 045-066：選項管理、講師、地址、班級擴充、定價、期間 filter） | P2 |
 
 ---
 

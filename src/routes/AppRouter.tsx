@@ -10,6 +10,7 @@ import { StudentsPage } from '../pages/StudentsPage';
 import { StudentDetailPage } from '../pages/StudentDetailPage';
 import { ClassesPage } from '../pages/ClassesPage';
 import { ClassDetailPage } from '../pages/ClassDetailPage';
+import { ClassPricingPage } from '../pages/ClassPricingPage';
 import { CoursesPage } from '../pages/CoursesPage';
 import { CourseDetailPage } from '../pages/CourseDetailPage';
 import { CourseSessionPage } from '../pages/CourseSessionPage';
@@ -98,6 +99,14 @@ export function AppRouter() {
           element={
             <AuthGuard>
               <ClassDetailPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.classPricing}
+          element={
+            <AuthGuard>
+              <ClassPricingPage />
             </AuthGuard>
           }
         />
