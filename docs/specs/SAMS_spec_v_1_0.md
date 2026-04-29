@@ -402,7 +402,7 @@ Firestore
   "branchId": "anhe",
   "className": "Scratch 初階班",
   "price": 3000,
-  "priceType": "per_class | per_month | per_session | batch",
+  "priceType": "per_class | per_month | per_session",
   "notes": "",
   "active": true
 }
@@ -417,7 +417,6 @@ Firestore
 | `per_class` | 每班次 | 整個班次（一期）一筆費用 |
 | `per_month` | 每月 | 每人每月收費 |
 | `per_session` | 每堂 | 每人每堂收費 |
-| `batch` | batch | 整批計費 |
 
 ### 功能
 

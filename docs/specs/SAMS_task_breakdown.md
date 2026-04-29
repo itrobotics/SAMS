@@ -1145,7 +1145,7 @@ BranchesPage 新增兩欄，方便分校頁一眼看出聯絡資訊。
   branchId: string,
   className: string,                                        // denormalized
   price: number,                                            // TWD，每人費用
-  priceType: 'per_class' | 'per_month' | 'per_session' | 'batch',
+  priceType: 'per_class' | 'per_month' | 'per_session',
   notes: string,
   active: boolean,
   createdAt: timestamp,
@@ -1158,7 +1158,6 @@ BranchesPage 新增兩欄，方便分校頁一眼看出聯絡資訊。
 - **per_class — 每班次**：整個班次（一期）一筆費用
 - **per_month — 每月**：每人每月收費
 - **per_session — 每堂**：每人每堂收費
-- **batch**：整批計費
 
 #### 列表欄位
 

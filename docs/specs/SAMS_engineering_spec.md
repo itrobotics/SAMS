@@ -158,7 +158,7 @@ Python Face Recognition API
   branchId: string,
   className: string,                                        // denormalized
   price: number,                                            // TWD，每人費用
-  priceType: 'per_class' | 'per_month' | 'per_session' | 'batch',
+  priceType: 'per_class' | 'per_month' | 'per_session',
   notes: string,
   active: boolean,
   createdAt: timestamp,

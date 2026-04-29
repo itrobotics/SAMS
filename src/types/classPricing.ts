@@ -6,25 +6,22 @@
 //   - per_class：每班次（整個班一筆）
 //   - per_month：每人每月收 price 元
 //   - per_session：每人每堂收 price 元
-//   - batch：整批計費
 //
 // 預估營收 = price × 該班目前啟用中學生人數（client 端計算，不寫回 Firestore）。
-// 註：per_class / batch 的營收計算等同於 price × 人數，與其他類型一致。
 
 import type { Timestamp } from 'firebase/firestore';
 
 export const CLASS_PRICING_COLLECTION = 'class_pricing';
 
-export type PriceType = 'per_class' | 'per_month' | 'per_session' | 'batch';
+export type PriceType = 'per_class' | 'per_month' | 'per_session';
 
 export const PRICE_TYPE_LABELS: Record<PriceType, string> = {
   per_class: '每班次',
   per_month: '每月',
   per_session: '每堂',
-  batch: 'batch',
 };
 
-export const PRICE_TYPES: PriceType[] = ['per_class', 'per_month', 'per_session', 'batch'];
+export const PRICE_TYPES: PriceType[] = ['per_class', 'per_month', 'per_session'];
 
 export function isValidPriceType(v: string): v is PriceType {
   return (PRICE_TYPES as string[]).includes(v);
