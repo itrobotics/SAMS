@@ -943,13 +943,180 @@ active face_profiles
 
 ---
 
-# Phase 16｜進階管理模組（MVP 後續迭代）
+# Phase 16｜MVP 後續優化
 
 ## 目標
 
-在 MVP 主流程穩定後，加入營運分析與管理輔助功能。本 phase 與排課 / 報到流程獨立，可分階段交付。
+MVP 主流程上線後逐步加入的營運與管理輔助功能。涵蓋共用基礎（自動代碼、選項管理、台灣地址）、主檔資料擴充（講師 / 學生 / 分校 / 班級）、進階模組（定價表、講師排課清單、期間 filter 統一）。
+
+開發順序與 commit 上的 Task 編號一致（Task 045 ~ Task 066）。本 phase 與排課 / 報到主流程獨立，可分階段交付。
+
+> 本 phase 期間另有數筆未編號的修補 commit（如「strip undefined meeting fields」、「add Firestore rules for instructors and app_options」、「support multiple meetings per class with per-meeting overrides」），不另列為 Task。
 
 ## Tasks
+
+### Task 045｜建立 app_options collection 與選項管理頁
+
+新增 `app_options` collection 作為共用下拉選單來源；每個 doc 代表一類選項。
+
+```ts
+{
+  key: string,            // doc ID（如 'courses'）
+  label: string,
+  values: string[],
+  updatedAt: timestamp
+}
+```
+
+預設 doc：
+
+- `courses` — 講師可教授課程
+- `relationships` — 緊急聯絡人關係
+
+新頁面 `/options`（HQ Admin 限定），可新增 / 刪除 / 排序選項。
+
+---
+
+### Task 046｜建立講師管理 CRUD
+
+新增 `instructors` collection 與 `/instructors` 頁面。欄位：基本資料 / 學歷 / 聯絡方式 / 緊急聯絡人 / 鐘點 / 累計教學時數。
+
+`instructorId` 採 `Tnnn` 流水號自動產生（透過 Task 047 的 helper）。
+
+---
+
+### Task 047｜自動產生主檔代碼
+
+新增 `src/utils/autoId.ts`：掃 collection 找最大 `${prefix}\d+` 後 +1，補零至 3 位。
+
+`studentId` / `classId` / `instructorId` 新增時自動帶入；使用者仍可改。
+
+---
+
+### Task 048｜班級列表顯示學生人數
+
+新增 `fetchAllActiveClassStudentCounts(): Promise<Map<string, number>>`，aggregate `class_students` 啟用人數。
+
+ClassesPage 一次性 fetch（非訂閱）並在每列顯示「學生人數」。
+
+---
+
+### Task 049｜支援跨分校加入學生
+
+班級學生管理頁加分校 filter（HQ 預設「全部分校」），移除原本「只能加同分校學生」的限制。`class_students.branchId` 仍寫入，方便日後 server-side 隔離。
+
+---
+
+### Task 050｜講師擴充欄位
+
+加入：性別、通訊地址（縣市 / 區 / 詳址分離）、戶籍地址（含「同通訊」勾選）、鐘點 `hourlyRate`、累計教學時數 `totalTeachingHours`、備註。
+
+---
+
+### Task 051｜學生編輯支援永久刪除
+
+`StudentFormDialog` 加紅色「刪除」按鈕（雙確認）；同時清掉該學生的 `class_students` 關聯。
+
+---
+
+### Task 052｜app_options 加 courseTypes
+
+`app_options` 新增 `courseTypes` doc，預設 19 種課程類型（micro:bit / 科學實驗 / MPM / Scratch …）。`OPTION_LABELS.courseTypes = '課程類型（班級）'`。
+
+---
+
+### Task 053｜班級表單改用講師下拉與課程類型下拉
+
+`ClassFormDialog` 移除 `teacherId` 文字輸入，改 `subscribeInstructors({ activeOnly: true })` 下拉；課程類型也改下拉（讀 `app_options.courseTypes`）。
+
+---
+
+### Task 054｜台灣縣市行政區資料與 TaiwanAddressFields component
+
+- 新增 `src/utils/taiwanAddress.ts` — 縣市 → 區陣列查表
+- 新增 `src/components/TaiwanAddressFields.tsx` — 共用元件，給 student / instructor 表單用
+
+---
+
+### Task 055｜班級列表顯示「T001-Joseph」格式
+
+ClassesPage 用 instructor map 顯示「ID-姓名」，未指定講師則「—」。
+
+---
+
+### Task 056｜學生擴充欄位
+
+加入：性別、生日、通訊地址（縣市 / 區 / 詳址）、戶籍地址（含「同通訊」勾選）、緊急聯絡人（姓名 + 關係）、備註。改用 `<TaiwanAddressFields>`。
+
+---
+
+### Task 057｜講師加生日 + 行政區欄位
+
+instructors 加 `birthday`；地址改用 `<TaiwanAddressFields>`（縣市 / 區 / 詳址三段）。
+
+---
+
+### Task 058｜班級加課程起訖日 / 時數 / 新增模式啟用 toggle
+
+`ClassDoc` 加：
+
+- `courseStartDate: 'YYYY-MM-DD'`
+- `courseEndDate: 'YYYY-MM-DD'`
+- `courseHours: number`
+
+`ClassFormDialog` 新增模式也顯示「啟用」checkbox（先前只有編輯模式）。
+
+---
+
+### Task 059｜班級時段顯示優化
+
+班級列表 meeting 顯示為「週二 18:00–18:30（講師 T003 matt | 教室 101）」。即時 join `instructors` 與 meeting override，可一眼看出每個時段的負責講師與教室。
+
+> 註：早期 task breakdown 把 Task 059 標為「MVP 上線檢查表」（見上），實際開發時 Task 059 編號被用在這個 UI 改動。檢查表項目仍適用於 MVP 上線，但未做為單一 commit。
+
+---
+
+### Task 060｜班級欄位改名與多重 filter
+
+- 「老師」→「上課講師」（單一班級可多講師）
+- ClassesPage 加：期間 filter / 講師代碼或姓名搜尋
+- `formatTeachers()` 列出該班所有講師（預設 `teacherId` + 各 meeting `teacherId` override，去重）
+
+---
+
+### Task 061｜講師排課清單頁
+
+新頁面 `/instructor-schedule`：列出某講師被排在哪些班級的哪些時段（預設 + meeting override）。篩選：講師 / 期間 / 啟用狀態。
+
+---
+
+### Task 062｜全 UI 將「老師」改為「講師」
+
+全域 string replace（UI label / 註解 / hint），底層欄位名 `teacherId` 不動以維持 schema 穩定。
+
+---
+
+### Task 063｜分校加客服電話、主任資訊、備註欄位
+
+`branches` 加：
+
+```ts
+{
+  servicePhone: string,    // 客服電話
+  directorName: string,    // 主任姓名
+  directorPhone: string,   // 主任手機
+  directorLineId: string,  // 主任 Line ID
+  notes: string            // 備註
+}
+```
+
+---
+
+### Task 064｜分校列表顯示 servicePhone 與 directorName
+
+BranchesPage 新增兩欄，方便分校頁一眼看出聯絡資訊。
+
+---
 
 ### Task 065｜建立班級定價表模組
 
@@ -1062,7 +1229,7 @@ ClassesPage 與 InstructorSchedulePage 原本各自實作「今日 / 本週 / �
 | Phase 13 | 報表分析 | P2 |
 | Phase 14 | 系統設定 | P2 |
 | Phase 15 | 測試與上線 | P0 |
-| Phase 16 | 進階管理模組（定價、Filter 統一等） | P2 |
+| Phase 16 | MVP 後續優化（Task 045-066：選項管理、講師、地址、班級擴充、定價、期間 filter） | P2 |
 
 ---
 
