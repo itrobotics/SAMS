@@ -59,6 +59,7 @@ export function decideVerdict(
 
 interface UseKioskCheckinArgs {
   enabled: boolean;                           // 攝影機 ready + state in READY
+  manualMode: boolean;                        // true = 不自動掃描，需手動觸發
   webcam: ReturnType<typeof useWebcam>;
   branchId: string;
   selectedSessions: Set<string>;              // 'class:xxx' / 'course:xxx'
@@ -81,6 +82,7 @@ interface KioskCheckinStatus {
   modelError: string | null;
   lastScanAt: Date | null;
   matchProfiles: number; // 目前比對範圍的 active 照片數
+  triggerScan: () => void;  // 手動模式下由按鈕呼叫
   // Task 039：CONFIRMING 狀態用的 callbacks
   confirmMatch: (m: KioskMatch) => Promise<void>;
   rejectMatch: () => void;
@@ -293,7 +295,7 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    if (!args.enabled) return;
+    if (!args.enabled || args.manualMode) return;
 
     function loop() {
       runOneScan().finally(() => {
@@ -373,12 +375,15 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
     args.setKioskState('FAILED');
   }, [args]);
 
+  const triggerScan = useCallback(() => void runOneScan(), [runOneScan]);
+
   return {
     modelLoaded,
     modelLoading,
     modelError,
     lastScanAt,
     matchProfiles: 0, // Task 041 會把整個 stats 補齊
+    triggerScan,
     confirmMatch,
     rejectMatch,
   };
