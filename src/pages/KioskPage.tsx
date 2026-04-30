@@ -795,26 +795,29 @@ function RosterGrid({ students }: { students: RosterStudent[] }) {
                 flex: 1,
                 background: statusBg(s.status),
                 borderRadius: 5,
-                padding: '0.25rem 0.45rem',
+                padding: '0 0.45rem',
                 display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: '0.35rem',
                 transition: 'background 0.4s',
                 minHeight: 0,
                 overflow: 'hidden',
               }}
             >
               <div style={{
-                fontSize: nameFz, fontWeight: 600, color: '#f1f5f9',
-                lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                {s.studentName}
-              </div>
-              <div style={{
-                fontSize: idFz, color: '#94a3b8', marginTop: '0.06rem',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                flexShrink: 0,
+                fontSize: idFz, color: '#64748b', lineHeight: 1,
+                whiteSpace: 'nowrap',
               }}>
                 {s.studentId}
+              </div>
+              <div style={{
+                flex: 1,
+                fontSize: nameFz, fontWeight: 700, color: '#f1f5f9',
+                lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {s.studentName}
               </div>
             </div>
           ))}
