@@ -12,7 +12,13 @@ import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { setStudentActive, subscribeStudents } from '../services/students';
 import { ROUTES } from '../routes/paths';
-import type { StudentDoc } from '../types/student';
+import {
+  PROFILE_TYPE_LABELS,
+  getChildProfileView,
+  getProfileType,
+  type ProfileType,
+  type StudentDoc,
+} from '../types/student';
 
 const ALL = '__all__';
 
@@ -25,6 +31,7 @@ export function StudentsPage() {
 
   const [filterBranch, setFilterBranch] = useState<string>(ALL);
   const [filterGrade, setFilterGrade] = useState<string>(ALL);
+  const [filterProfileType, setFilterProfileType] = useState<'all' | ProfileType>('all');
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'disabled'>('active');
   const [keyword, setKeyword] = useState('');
   const [editing, setEditing] = useState<StudentDoc | null>(null);
@@ -77,24 +84,40 @@ export function StudentsPage() {
 
   const grades = useMemo(() => {
     const set = new Set<string>();
-    students.forEach((s) => s.grade && set.add(s.grade));
+    students.forEach((s) => {
+      const g = getChildProfileView(s).grade;
+      if (g) set.add(g);
+    });
     return Array.from(set).sort();
   }, [students]);
 
   const visible = useMemo(() => {
     const kw = keyword.trim().toLowerCase();
     return students.filter((s) => {
+      const ptype = getProfileType(s);
       if (filterBranch !== ALL && s.branchId !== filterBranch) return false;
-      if (filterGrade !== ALL && s.grade !== filterGrade) return false;
+      if (filterProfileType !== 'all' && ptype !== filterProfileType) return false;
+      // 年級篩選只對兒童有意義；成人在「指定年級」的情境下不顯示。
+      if (filterGrade !== ALL) {
+        if (ptype !== 'child') return false;
+        if (getChildProfileView(s).grade !== filterGrade) return false;
+      }
       if (filterActive === 'active' && !s.active) return false;
       if (filterActive === 'disabled' && s.active) return false;
       if (kw) {
-        const hay = `${s.name} ${s.studentId} ${s.parentName ?? ''} ${s.parentPhone ?? ''}`.toLowerCase();
+        const cv = getChildProfileView(s);
+        const ap = s.adultProfile;
+        const hay = [
+          s.name, s.studentId,
+          cv.parent1Name, cv.parent1Phone, cv.parent2Name ?? '', cv.parent2Phone ?? '',
+          ap?.company ?? '', ap?.jobTitle ?? '',
+          s.parentName ?? '', s.parentPhone ?? '',
+        ].join(' ').toLowerCase();
         if (!hay.includes(kw)) return false;
       }
       return true;
     });
-  }, [students, filterBranch, filterGrade, filterActive, keyword]);
+  }, [students, filterBranch, filterProfileType, filterGrade, filterActive, keyword]);
 
   const branchName = (id: string) => branches.find((b) => b.branchId === id)?.name ?? id;
 
@@ -128,6 +151,15 @@ export function StudentsPage() {
             </option>
           ))}
         </select>
+        <select
+          value={filterProfileType}
+          onChange={(e) => setFilterProfileType(e.target.value as 'all' | ProfileType)}
+          style={styles.input}
+        >
+          <option value="all">全部類型</option>
+          <option value="child">{PROFILE_TYPE_LABELS.child}</option>
+          <option value="adult">{PROFILE_TYPE_LABELS.adult}</option>
+        </select>
         <select value={filterGrade} onChange={(e) => setFilterGrade(e.target.value)} style={styles.input}>
           <option value={ALL}>全部年級</option>
           {grades.map((g) => (
@@ -155,9 +187,10 @@ export function StudentsPage() {
             <tr>
               <th style={styles.th}>學號</th>
               <th style={styles.th}>姓名</th>
-              <th style={styles.th}>年級</th>
+              <th style={styles.th}>類型</th>
+              <th style={styles.th}>年級 / 學歷</th>
               <th style={styles.th}>分校</th>
-              <th style={styles.th}>家長</th>
+              <th style={styles.th}>聯絡人</th>
               <th style={styles.th}>電話</th>
               <th style={styles.th}>狀態</th>
               <th style={styles.th}>操作</th>
@@ -166,24 +199,34 @@ export function StudentsPage() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={8} style={styles.empty}>載入中…</td>
+                <td colSpan={9} style={styles.empty}>載入中…</td>
               </tr>
             )}
             {!loading && visible.length === 0 && (
               <tr>
-                <td colSpan={8} style={styles.empty}>沒有符合條件的學生</td>
+                <td colSpan={9} style={styles.empty}>沒有符合條件的學生</td>
               </tr>
             )}
-            {visible.map((s) => (
+            {visible.map((s) => {
+              const ptype = getProfileType(s);
+              const isChild = ptype === 'child';
+              const cv = isChild ? getChildProfileView(s) : null;
+              const ap = s.adultProfile;
+              return (
               <tr key={s.studentId}>
                 <td style={styles.td}><code>{s.studentId}</code></td>
                 <td style={styles.td}>
                   <Link to={ROUTES.studentDetail(s.studentId)}>{s.name}</Link>
                 </td>
-                <td style={styles.td}>{s.grade || '—'}</td>
+                <td style={styles.td}>
+                  <span style={isChild ? styles.pillChild : styles.pillAdult}>
+                    {PROFILE_TYPE_LABELS[ptype]}
+                  </span>
+                </td>
+                <td style={styles.td}>{(isChild ? cv?.grade : ap?.education) || '—'}</td>
                 <td style={styles.td}>{branchName(s.branchId)}</td>
-                <td style={styles.td}>{s.parentName || '—'}</td>
-                <td style={styles.td}>{s.parentPhone || '—'}</td>
+                <td style={styles.td}>{(isChild ? cv?.parent1Name : ap?.company) || '—'}</td>
+                <td style={styles.td}>{(isChild ? cv?.parent1Phone : '') || '—'}</td>
                 <td style={styles.td}>
                   <span style={s.active ? styles.pillActive : styles.pillInactive}>
                     {s.active ? '啟用' : '停用'}
@@ -203,7 +246,8 @@ export function StudentsPage() {
                   </button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -256,6 +300,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   pillInactive: {
     padding: '0.15rem 0.55rem', borderRadius: 12, fontSize: '0.8rem', background: '#f3f4f6', color: '#6b7280',
+  },
+  pillChild: {
+    padding: '0.15rem 0.55rem', borderRadius: 12, fontSize: '0.8rem', background: '#dbeafe', color: '#1e40af',
+  },
+  pillAdult: {
+    padding: '0.15rem 0.55rem', borderRadius: 12, fontSize: '0.8rem', background: '#fef3c7', color: '#92400e',
   },
   primaryBtn: {
     padding: '0.55rem 1rem',

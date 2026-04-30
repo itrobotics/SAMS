@@ -1,4 +1,11 @@
 // 學生新增 / 編輯表單（Task 056）
+//
+// 學員類型（profileType）：
+//   - child（小朋友）：年級、就讀學校、家長 1/2 等
+//   - adult（成人）：最高學歷、公司、職稱、身分證字號等
+// 編輯時可切換類型，但會清空對應的舊 profile 資料（以 deleteField() 移除）。
+// 舊資料未含 profileType → 視為 child；舊頂層欄位 grade/parentName/parentPhone
+// 自動填入 child 表單欄位。
 
 import { useEffect, useState, type FormEvent } from 'react';
 
@@ -9,10 +16,16 @@ import { useBranches } from '../hooks/useBranches';
 import { subscribeOptions } from '../services/appOptions';
 import { createStudent, deleteStudent, updateStudent } from '../services/students';
 import {
+  ADULT_EDUCATION_OPTIONS,
+  CHILD_GRADE_OPTIONS,
   GENDER_LABELS,
+  PROFILE_TYPE_LABELS,
   STUDENTS_COLLECTION,
+  getChildProfileView,
+  getProfileType,
   isValidStudentId,
   type Gender,
+  type ProfileType,
   type StudentDoc,
 } from '../types/student';
 import { OPTION_KEYS } from '../types/appOptions';
@@ -44,9 +57,25 @@ export function StudentFormDialog({
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender>('other');
   const [birthday, setBirthday] = useState('');
-  const [grade, setGrade] = useState('');
-  const [parentName, setParentName] = useState('');
-  const [parentPhone, setParentPhone] = useState('');
+  const [profileType, setProfileType] = useState<ProfileType>('child');
+
+  // child profile 欄位
+  const [childGrade, setChildGrade] = useState('');
+  const [childSchool, setChildSchool] = useState('');
+  const [parent1Name, setParent1Name] = useState('');
+  const [parent1Phone, setParent1Phone] = useState('');
+  const [parent1Email, setParent1Email] = useState('');
+  const [parent2Name, setParent2Name] = useState('');
+  const [parent2Phone, setParent2Phone] = useState('');
+
+  // adult profile 欄位
+  const [adultEducation, setAdultEducation] = useState('');
+  const [adultGraduateSchool, setAdultGraduateSchool] = useState('');
+  const [adultMajor, setAdultMajor] = useState('');
+  const [adultCompany, setAdultCompany] = useState('');
+  const [adultJobTitle, setAdultJobTitle] = useState('');
+  const [adultIdNumber, setAdultIdNumber] = useState('');
+
   const [mailingAddr, setMailingAddr] = useState<AddressValue>(EMPTY_ADDR);
   const [regSameAsMailing, setRegSameAsMailing] = useState(false);
   const [registeredAddr, setRegisteredAddr] = useState<AddressValue>(EMPTY_ADDR);
@@ -73,9 +102,29 @@ export function StudentFormDialog({
     setName(initial?.name ?? '');
     setGender(initial?.gender ?? 'other');
     setBirthday(initial?.birthday ?? '');
-    setGrade(initial?.grade ?? '');
-    setParentName(initial?.parentName ?? '');
-    setParentPhone(initial?.parentPhone ?? '');
+
+    const initialType: ProfileType = initial ? getProfileType(initial) : 'child';
+    setProfileType(initialType);
+
+    // child profile：用 view helper 兼容舊資料
+    const cp = initial ? getChildProfileView(initial) : null;
+    setChildGrade(cp?.grade ?? '');
+    setChildSchool(cp?.school ?? '');
+    setParent1Name(cp?.parent1Name ?? '');
+    setParent1Phone(cp?.parent1Phone ?? '');
+    setParent1Email(cp?.parent1Email ?? '');
+    setParent2Name(cp?.parent2Name ?? '');
+    setParent2Phone(cp?.parent2Phone ?? '');
+
+    // adult profile
+    const ap = initial?.adultProfile;
+    setAdultEducation(ap?.education ?? '');
+    setAdultGraduateSchool(ap?.graduateSchool ?? '');
+    setAdultMajor(ap?.major ?? '');
+    setAdultCompany(ap?.company ?? '');
+    setAdultJobTitle(ap?.jobTitle ?? '');
+    setAdultIdNumber(ap?.idNumber ?? '');
+
     setMailingAddr({
       city: initial?.mailingCity ?? '',
       district: initial?.mailingDistrict ?? '',
@@ -99,6 +148,27 @@ export function StudentFormDialog({
     if (!branchId && branches.length === 1) setBranchId(branches[0].branchId);
   }, [open, isEdit, branchId, branches]);
 
+  // 切換學員類型：編輯模式且使用者真的改變類型時，提示會清除原有 profile 資料
+  function handleProfileTypeChange(next: ProfileType) {
+    if (next === profileType) return;
+    if (isEdit) {
+      const ok = window.confirm(
+        '切換類型將清除原有專屬資料（如年級、家長、公司、學歷等），確定要繼續嗎？',
+      );
+      if (!ok) return;
+      // 清空對應欄位
+      if (next === 'adult') {
+        setChildGrade(''); setChildSchool('');
+        setParent1Name(''); setParent1Phone(''); setParent1Email('');
+        setParent2Name(''); setParent2Phone('');
+      } else {
+        setAdultEducation(''); setAdultGraduateSchool(''); setAdultMajor('');
+        setAdultCompany(''); setAdultJobTitle(''); setAdultIdNumber('');
+      }
+    }
+    setProfileType(next);
+  }
+
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (submitting) return;
@@ -112,10 +182,35 @@ export function StudentFormDialog({
     setError(null);
     try {
       const regAddr = regSameAsMailing ? mailingAddr : registeredAddr;
+      const childProfile = profileType === 'child' ? {
+        grade: childGrade,
+        school: childSchool,
+        parent1Name,
+        parent1Phone,
+        parent1Email,
+        parent2Name,
+        parent2Phone,
+      } : null;
+      const adultProfile = profileType === 'adult' ? {
+        birthDate: birthday,
+        education: adultEducation,
+        graduateSchool: adultGraduateSchool,
+        major: adultMajor,
+        company: adultCompany,
+        jobTitle: adultJobTitle,
+        idNumber: adultIdNumber,
+      } : null;
+
       if (isEdit && initial) {
         await updateStudent(initial.studentId, {
           branchId, name, gender, birthday,
-          grade, parentName, parentPhone,
+          profileType,
+          childProfile,
+          adultProfile,
+          // 兒童同時更新舊頂層欄位，成人則清空，列表頁仍可使用舊欄位顯示
+          grade: profileType === 'child' ? childGrade : '',
+          parentName: profileType === 'child' ? parent1Name : '',
+          parentPhone: profileType === 'child' ? parent1Phone : '',
           mailingCity: mailingAddr.city,
           mailingDistrict: mailingAddr.district,
           mailingAddress: mailingAddr.address,
@@ -128,7 +223,9 @@ export function StudentFormDialog({
       } else {
         await createStudent({
           studentId, branchId, name, gender, birthday,
-          grade, parentName, parentPhone,
+          profileType,
+          childProfile: childProfile ?? undefined,
+          adultProfile: adultProfile ?? undefined,
           mailingCity: mailingAddr.city,
           mailingDistrict: mailingAddr.district,
           mailingAddress: mailingAddr.address,
@@ -153,6 +250,26 @@ export function StudentFormDialog({
       <form onSubmit={handleSubmit}>
         {error && <div style={formStyles.error}>{error}</div>}
 
+        {/* 學員類型 */}
+        <div style={formStyles.field}>
+          <label style={formStyles.label}>
+            學員類型<span style={formStyles.required}>*</span>
+          </label>
+          <div style={{ display: 'flex', gap: '1rem', padding: '0.45rem 0' }}>
+            {(['child', 'adult'] as ProfileType[]).map((t) => (
+              <label key={t} style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', cursor: 'pointer' }}>
+                <input type="radio" name="profileType" value={t}
+                  checked={profileType === t}
+                  onChange={() => handleProfileTypeChange(t)} disabled={submitting} />
+                {PROFILE_TYPE_LABELS[t]}
+              </label>
+            ))}
+          </div>
+          {isEdit && (
+            <span style={formStyles.hint}>切換類型將清除原有專屬資料。</span>
+          )}
+        </div>
+
         {/* 學號 */}
         <div style={formStyles.field}>
           <label style={formStyles.label}>學號<span style={formStyles.required}>*</span></label>
@@ -176,22 +293,15 @@ export function StudentFormDialog({
           </select>
         </div>
 
-        {/* 姓名 + 性別 + 生日 */}
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <div style={{ ...formStyles.field, flex: 2 }}>
-            <label style={formStyles.label}>姓名<span style={formStyles.required}>*</span></label>
-            <input style={formStyles.input} value={name}
-              onChange={(e) => setName(e.target.value)} placeholder="例：王小明"
-              disabled={submitting} required />
-          </div>
-          <div style={{ ...formStyles.field, flex: 1 }}>
-            <label style={formStyles.label}>年級</label>
-            <input style={formStyles.input} value={grade}
-              onChange={(e) => setGrade(e.target.value)} placeholder="例：小三"
-              disabled={submitting} />
-          </div>
+        {/* 姓名 */}
+        <div style={formStyles.field}>
+          <label style={formStyles.label}>姓名<span style={formStyles.required}>*</span></label>
+          <input style={formStyles.input} value={name}
+            onChange={(e) => setName(e.target.value)} placeholder="例：王小明"
+            disabled={submitting} required />
         </div>
 
+        {/* 性別 + 生日 */}
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <div style={{ ...formStyles.field, flex: 1 }}>
             <label style={formStyles.label}>性別</label>
@@ -206,27 +316,120 @@ export function StudentFormDialog({
             </div>
           </div>
           <div style={{ ...formStyles.field, flex: 1 }}>
-            <label style={formStyles.label}>生日</label>
+            <label style={formStyles.label}>{profileType === 'adult' ? '出生日期' : '生日'}</label>
             <input type="date" style={formStyles.input} value={birthday}
               onChange={(e) => setBirthday(e.target.value)} disabled={submitting} />
           </div>
         </div>
 
-        {/* 家長 */}
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <div style={{ ...formStyles.field, flex: 1 }}>
-            <label style={formStyles.label}>家長姓名</label>
-            <input style={formStyles.input} value={parentName}
-              onChange={(e) => setParentName(e.target.value)} placeholder="例：王媽媽"
-              disabled={submitting} />
+        {/* 類型專屬區塊 */}
+        {profileType === 'child' ? (
+          <div style={styles.profileGroup}>
+            <div style={styles.profileGroupTitle}>學籍 / 家長資料</div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div style={{ ...formStyles.field, flex: 1 }}>
+                <label style={formStyles.label}>年級</label>
+                <select style={formStyles.select} value={childGrade}
+                  onChange={(e) => setChildGrade(e.target.value)} disabled={submitting}>
+                  <option value="">請選擇</option>
+                  {CHILD_GRADE_OPTIONS.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ ...formStyles.field, flex: 2 }}>
+                <label style={formStyles.label}>就讀學校</label>
+                <input style={formStyles.input} value={childSchool}
+                  onChange={(e) => setChildSchool(e.target.value)}
+                  placeholder="例：仁愛國小" disabled={submitting} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div style={{ ...formStyles.field, flex: 1 }}>
+                <label style={formStyles.label}>家長 1 姓名</label>
+                <input style={formStyles.input} value={parent1Name}
+                  onChange={(e) => setParent1Name(e.target.value)}
+                  placeholder="例：王媽媽" disabled={submitting} />
+              </div>
+              <div style={{ ...formStyles.field, flex: 1 }}>
+                <label style={formStyles.label}>家長 1 電話</label>
+                <input type="tel" style={formStyles.input} value={parent1Phone}
+                  onChange={(e) => setParent1Phone(e.target.value)}
+                  placeholder="09xxxxxxxx" disabled={submitting} />
+              </div>
+            </div>
+            <div style={formStyles.field}>
+              <label style={formStyles.label}>家長 1 Email</label>
+              <input type="email" style={formStyles.input} value={parent1Email}
+                onChange={(e) => setParent1Email(e.target.value)}
+                placeholder="parent1@example.com" disabled={submitting} />
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div style={{ ...formStyles.field, flex: 1 }}>
+                <label style={formStyles.label}>家長 2 姓名</label>
+                <input style={formStyles.input} value={parent2Name}
+                  onChange={(e) => setParent2Name(e.target.value)}
+                  placeholder="可留空" disabled={submitting} />
+              </div>
+              <div style={{ ...formStyles.field, flex: 1 }}>
+                <label style={formStyles.label}>家長 2 電話</label>
+                <input type="tel" style={formStyles.input} value={parent2Phone}
+                  onChange={(e) => setParent2Phone(e.target.value)}
+                  placeholder="可留空" disabled={submitting} />
+              </div>
+            </div>
           </div>
-          <div style={{ ...formStyles.field, flex: 1 }}>
-            <label style={formStyles.label}>家長電話</label>
-            <input type="tel" style={formStyles.input} value={parentPhone}
-              onChange={(e) => setParentPhone(e.target.value)} placeholder="例：09xxxxxxxx"
-              disabled={submitting} />
+        ) : (
+          <div style={styles.profileGroup}>
+            <div style={styles.profileGroupTitle}>學歷 / 工作資料</div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div style={{ ...formStyles.field, flex: 1 }}>
+                <label style={formStyles.label}>最高學歷</label>
+                <select style={formStyles.select} value={adultEducation}
+                  onChange={(e) => setAdultEducation(e.target.value)} disabled={submitting}>
+                  <option value="">請選擇</option>
+                  {ADULT_EDUCATION_OPTIONS.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ ...formStyles.field, flex: 2 }}>
+                <label style={formStyles.label}>身分證字號</label>
+                <input style={formStyles.input} value={adultIdNumber}
+                  onChange={(e) => setAdultIdNumber(e.target.value)}
+                  placeholder="職訓課程報名用" disabled={submitting} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div style={{ ...formStyles.field, flex: 1 }}>
+                <label style={formStyles.label}>畢業學校</label>
+                <input style={formStyles.input} value={adultGraduateSchool}
+                  onChange={(e) => setAdultGraduateSchool(e.target.value)}
+                  placeholder="例：台灣大學" disabled={submitting} />
+              </div>
+              <div style={{ ...formStyles.field, flex: 1 }}>
+                <label style={formStyles.label}>科系</label>
+                <input style={formStyles.input} value={adultMajor}
+                  onChange={(e) => setAdultMajor(e.target.value)}
+                  placeholder="例：資訊工程" disabled={submitting} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div style={{ ...formStyles.field, flex: 1 }}>
+                <label style={formStyles.label}>任職公司</label>
+                <input style={formStyles.input} value={adultCompany}
+                  onChange={(e) => setAdultCompany(e.target.value)}
+                  placeholder="例：艾鍗科技" disabled={submitting} />
+              </div>
+              <div style={{ ...formStyles.field, flex: 1 }}>
+                <label style={formStyles.label}>職稱</label>
+                <input style={formStyles.input} value={adultJobTitle}
+                  onChange={(e) => setAdultJobTitle(e.target.value)}
+                  placeholder="例：工程師" disabled={submitting} />
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 通訊地址 */}
         <div style={formStyles.field}>
@@ -325,3 +528,19 @@ export function StudentFormDialog({
     </Modal>
   );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  profileGroup: {
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    padding: '0.85rem 1rem 0.4rem',
+    background: '#fafafa',
+    marginBottom: '0.9rem',
+  },
+  profileGroupTitle: {
+    fontSize: '0.85rem',
+    color: '#374151',
+    fontWeight: 600,
+    marginBottom: '0.5rem',
+  },
+};

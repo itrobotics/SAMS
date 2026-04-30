@@ -74,14 +74,59 @@ Python Face Recognition API
 
 ## students
 
+學員分兩種類型：`child`（小朋友）與 `adult`（成人）。
+兩者共用出席、班級、課程方案功能；僅基本資料欄位不同。
+舊資料無 `profileType` 時，讀取端視為 `child`。
+
 ```ts
 {
   studentId: string,
   branchId: string,
   name: string,
+  gender: 'male' | 'female' | 'other',
+  birthday: string,                       // YYYY-MM-DD（共用，向下相容）
+
+  profileType: 'child' | 'adult',         // 預設 'child'
+
+  // 小朋友專屬
+  childProfile?: {
+    grade: string,                         // '小一'..'高三'
+    school: string,
+    parent1Name: string,
+    parent1Phone: string,
+    parent1Email?: string,
+    parent2Name?: string,
+    parent2Phone?: string
+  },
+
+  // 成人專屬
+  adultProfile?: {
+    birthDate?: string,                    // YYYY-MM-DD
+    education?: string,                    // '高中/職' | '專科' | '大學' | '碩士' | '博士'
+    graduateSchool?: string,
+    major?: string,
+    company?: string,
+    jobTitle?: string,
+    idNumber?: string                      // 身分證字號（職訓用）
+  },
+
+  // 向下相容欄位（child 類型仍會同步寫入頂層）
   grade: string,
   parentName: string,
   parentPhone: string,
+
+  // 通訊 / 戶籍地址、緊急聯絡人、備註
+  mailingCity: string,
+  mailingDistrict: string,
+  mailingAddress: string,
+  registeredAddressSameAsMailing: boolean,
+  registeredCity: string,
+  registeredDistrict: string,
+  registeredAddress: string,
+  emergencyContactName: string,
+  emergencyContactRelation: string,
+  notes: string,
+
   active: boolean,
   createdAt: timestamp
 }

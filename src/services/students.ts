@@ -3,6 +3,7 @@
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   onSnapshot,
@@ -19,7 +20,10 @@ import { db } from './firebase';
 import {
   STUDENTS_COLLECTION,
   isValidStudentId,
+  type AdultProfile,
+  type ChildProfile,
   type NewStudentInput,
+  type ProfileType,
   type StudentDoc,
   type UpdateStudentInput,
 } from '../types/student';
@@ -30,6 +34,32 @@ function studentRef(studentId: string) {
 
 function snapshotToStudent(snap: { id: string; data: () => Record<string, unknown> }): StudentDoc {
   return { studentId: snap.id, ...(snap.data() as Omit<StudentDoc, 'studentId'>) };
+}
+
+// 將 ChildProfile 清理成 Firestore 友善（移除 undefined / 空字串保留）
+function cleanChildProfile(p: ChildProfile): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    grade: p.grade?.trim() ?? '',
+    school: p.school?.trim() ?? '',
+    parent1Name: p.parent1Name?.trim() ?? '',
+    parent1Phone: p.parent1Phone?.trim() ?? '',
+  };
+  if (p.parent1Email !== undefined) out.parent1Email = p.parent1Email.trim();
+  if (p.parent2Name !== undefined) out.parent2Name = p.parent2Name.trim();
+  if (p.parent2Phone !== undefined) out.parent2Phone = p.parent2Phone.trim();
+  return out;
+}
+
+function cleanAdultProfile(p: AdultProfile): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (p.birthDate !== undefined) out.birthDate = p.birthDate.trim();
+  if (p.education !== undefined) out.education = p.education.trim();
+  if (p.graduateSchool !== undefined) out.graduateSchool = p.graduateSchool.trim();
+  if (p.major !== undefined) out.major = p.major.trim();
+  if (p.company !== undefined) out.company = p.company.trim();
+  if (p.jobTitle !== undefined) out.jobTitle = p.jobTitle.trim();
+  if (p.idNumber !== undefined) out.idNumber = p.idNumber.trim();
+  return out;
 }
 
 export async function fetchStudent(studentId: string): Promise<StudentDoc | null> {
@@ -75,18 +105,34 @@ export async function createStudent(input: NewStudentInput): Promise<void> {
   if (!input.name.trim()) {
     throw new Error('請填寫學生姓名');
   }
+  const profileType: ProfileType = input.profileType ?? 'child';
+
+  // 為了兼容舊頁面（StudentsPage 列表會直接讀 grade / parentName / parentPhone），
+  // 兒童類型同時把資料映射回頂層舊欄位；成人則填空字串。
+  const legacyGrade = profileType === 'child'
+    ? (input.childProfile?.grade ?? input.grade ?? '').trim()
+    : '';
+  const legacyParentName = profileType === 'child'
+    ? (input.childProfile?.parent1Name ?? input.parentName ?? '').trim()
+    : '';
+  const legacyParentPhone = profileType === 'child'
+    ? (input.childProfile?.parent1Phone ?? input.parentPhone ?? '').trim()
+    : '';
+
   const existing = await getDoc(studentRef(studentId));
   if (existing.exists()) {
     throw new Error(`學號「${studentId}」已存在`);
   }
-  await setDoc(studentRef(studentId), {
+
+  const data: Record<string, unknown> = {
     branchId: input.branchId.trim(),
     name: input.name.trim(),
     gender: input.gender ?? 'other',
     birthday: input.birthday?.trim() ?? '',
-    grade: input.grade?.trim() ?? '',
-    parentName: input.parentName?.trim() ?? '',
-    parentPhone: input.parentPhone?.trim() ?? '',
+    profileType,
+    grade: legacyGrade,
+    parentName: legacyParentName,
+    parentPhone: legacyParentPhone,
     mailingCity: input.mailingCity?.trim() ?? '',
     mailingDistrict: input.mailingDistrict?.trim() ?? '',
     mailingAddress: input.mailingAddress?.trim() ?? '',
@@ -99,7 +145,14 @@ export async function createStudent(input: NewStudentInput): Promise<void> {
     notes: input.notes?.trim() ?? '',
     active: true,
     createdAt: serverTimestamp(),
-  });
+  };
+  if (profileType === 'child' && input.childProfile) {
+    data.childProfile = cleanChildProfile(input.childProfile);
+  }
+  if (profileType === 'adult' && input.adultProfile) {
+    data.adultProfile = cleanAdultProfile(input.adultProfile);
+  }
+  await setDoc(studentRef(studentId), data);
 }
 
 export async function updateStudent(studentId: string, patch: UpdateStudentInput): Promise<void> {
@@ -108,6 +161,11 @@ export async function updateStudent(studentId: string, patch: UpdateStudentInput
   if (patch.name !== undefined) cleaned.name = patch.name.trim();
   if (patch.gender !== undefined) cleaned.gender = patch.gender;
   if (patch.birthday !== undefined) cleaned.birthday = patch.birthday.trim();
+  if (patch.profileType !== undefined) cleaned.profileType = patch.profileType;
+  if (patch.childProfile === null) cleaned.childProfile = deleteField();
+  else if (patch.childProfile !== undefined) cleaned.childProfile = cleanChildProfile(patch.childProfile);
+  if (patch.adultProfile === null) cleaned.adultProfile = deleteField();
+  else if (patch.adultProfile !== undefined) cleaned.adultProfile = cleanAdultProfile(patch.adultProfile);
   if (patch.grade !== undefined) cleaned.grade = patch.grade.trim();
   if (patch.parentName !== undefined) cleaned.parentName = patch.parentName.trim();
   if (patch.parentPhone !== undefined) cleaned.parentPhone = patch.parentPhone.trim();

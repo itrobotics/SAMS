@@ -15,7 +15,13 @@ import { useBranches } from '../hooks/useBranches';
 import { db } from '../services/firebase';
 import { subscribeStudentClasses } from '../services/classStudents';
 import { canAccessBranch } from '../types/user';
-import { STUDENTS_COLLECTION, type StudentDoc } from '../types/student';
+import {
+  PROFILE_TYPE_LABELS,
+  STUDENTS_COLLECTION,
+  getChildProfileView,
+  getProfileType,
+  type StudentDoc,
+} from '../types/student';
 import type { ClassStudentDoc } from '../types/classStudent';
 
 export function StudentDetailPage() {
@@ -70,6 +76,10 @@ export function StudentDetailPage() {
   }
 
   const branchName = branches.find((b) => b.branchId === student.branchId)?.name ?? student.branchId;
+  const profileType = getProfileType(student);
+  const isChild = profileType === 'child';
+  const childView = isChild ? getChildProfileView(student) : null;
+  const adult = student.adultProfile;
 
   return (
     <section>
@@ -78,7 +88,12 @@ export function StudentDetailPage() {
           <Link to="/students" style={styles.back}>← 回列表</Link>
           <h1 style={styles.title}>{student.name}</h1>
           <p style={styles.subtitle}>
-            學號 <code>{student.studentId}</code> · {branchName} · {student.grade || '未設定年級'}
+            <span style={isChild ? styles.pillChild : styles.pillAdult}>
+              {PROFILE_TYPE_LABELS[profileType]}
+            </span>
+            {' · '}
+            學號 <code>{student.studentId}</code> · {branchName}
+            {isChild && ` · ${childView?.grade || '未設定年級'}`}
             {' · '}
             <span style={student.active ? styles.pillActive : styles.pillInactive}>
               {student.active ? '啟用' : '停用'}
@@ -92,14 +107,42 @@ export function StudentDetailPage() {
 
       <div style={styles.grid}>
         <article style={styles.card}>
-          <h2 style={styles.h2}>基本資料</h2>
+          <h2 style={styles.h2}>
+            學籍資料
+            <span style={isChild ? styles.pillChild : styles.pillAdult}>
+              {PROFILE_TYPE_LABELS[profileType]}
+            </span>
+          </h2>
           <dl style={styles.dl}>
             <DT label="姓名">{student.name}</DT>
             <DT label="學號"><code>{student.studentId}</code></DT>
-            <DT label="年級">{student.grade || '—'}</DT>
             <DT label="分校">{branchName}（<code>{student.branchId}</code>）</DT>
-            <DT label="家長姓名">{student.parentName || '—'}</DT>
-            <DT label="家長電話">{student.parentPhone || '—'}</DT>
+            {isChild && childView && (
+              <>
+                <DT label="年級">{childView.grade || '—'}</DT>
+                <DT label="就讀學校">{childView.school || '—'}</DT>
+                <DT label="家長 1 姓名">{childView.parent1Name || '—'}</DT>
+                <DT label="家長 1 電話">{childView.parent1Phone || '—'}</DT>
+                <DT label="家長 1 Email">{childView.parent1Email || '—'}</DT>
+                {(childView.parent2Name || childView.parent2Phone) && (
+                  <>
+                    <DT label="家長 2 姓名">{childView.parent2Name || '—'}</DT>
+                    <DT label="家長 2 電話">{childView.parent2Phone || '—'}</DT>
+                  </>
+                )}
+              </>
+            )}
+            {!isChild && (
+              <>
+                <DT label="生日">{adult?.birthDate || student.birthday || '—'}</DT>
+                <DT label="最高學歷">{adult?.education || '—'}</DT>
+                <DT label="畢業學校">{adult?.graduateSchool || '—'}</DT>
+                <DT label="科系">{adult?.major || '—'}</DT>
+                <DT label="任職公司">{adult?.company || '—'}</DT>
+                <DT label="職稱">{adult?.jobTitle || '—'}</DT>
+                {adult?.idNumber && <DT label="身分證字號">{adult.idNumber}</DT>}
+              </>
+            )}
             <DT label="狀態">{student.active ? '啟用' : '停用'}</DT>
           </dl>
         </article>
@@ -177,7 +220,14 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
     padding: '1.25rem',
   },
-  h2: { margin: '0 0 0.75rem', fontSize: '1.05rem', color: '#374151' },
+  h2: {
+    margin: '0 0 0.75rem',
+    fontSize: '1.05rem',
+    color: '#374151',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
   dl: { margin: 0, display: 'grid', gridTemplateColumns: '6rem 1fr', columnGap: '0.75rem', rowGap: '0.5rem' },
   dt: { color: '#6b7280', fontSize: '0.85rem' },
   dd: { margin: 0, fontSize: '0.95rem' },
@@ -187,5 +237,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   pillInactive: {
     padding: '0.1rem 0.5rem', borderRadius: 12, fontSize: '0.8rem', background: '#f3f4f6', color: '#6b7280',
+  },
+  pillChild: {
+    padding: '0.1rem 0.5rem', borderRadius: 12, fontSize: '0.8rem', background: '#dbeafe', color: '#1e40af',
+  },
+  pillAdult: {
+    padding: '0.1rem 0.5rem', borderRadius: 12, fontSize: '0.8rem', background: '#fef3c7', color: '#92400e',
   },
 };

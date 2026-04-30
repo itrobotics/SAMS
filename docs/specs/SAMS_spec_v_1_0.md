@@ -160,26 +160,62 @@ Face Recognition: Python Module API
 
 ## M03 學生主檔模組
 
+### 學員類型（profileType）
+
+學員分兩類：
+
+- **child（小朋友）**：補習班、安親班、才藝班的學齡學生
+- **adult（成人）**：企業教育中心、職訓課程的成人學員
+
+兩者**共用**所有出席、班級、課程方案功能；**僅基本資料欄位不同**。
+
+舊資料若無 `profileType`，讀取端一律視為 `child`。
+
 ### 欄位
 
 ```json
 {
   "studentId": "S001",
   "name": "王小明",
-  "grade": "小三",
   "branchId": "anhe",
-  "parentName": "王媽媽",
-  "phone": "09xx",
+  "profileType": "child",
+
+  // 小朋友專屬（profileType === "child"）
+  "childProfile": {
+    "grade": "小三",
+    "school": "仁愛國小",
+    "parent1Name": "王媽媽",
+    "parent1Phone": "09xx",
+    "parent1Email": "...",
+    "parent2Name": "...",
+    "parent2Phone": "..."
+  },
+
+  // 成人專屬（profileType === "adult"）
+  "adultProfile": {
+    "birthDate": "1990-05-12",
+    "education": "大學",
+    "graduateSchool": "台灣大學",
+    "major": "資訊工程",
+    "company": "艾鍗科技",
+    "jobTitle": "工程師",
+    "idNumber": "A123456789"
+  },
+
   "status": "active"
 }
 ```
 
+兒童 `grade` 下拉值：`小一`/`小二`/.../`小六`/`國一`/`國二`/`國三`/`高一`/`高二`/`高三`。
+成人 `education` 下拉值：`高中/職`/`專科`/`大學`/`碩士`/`博士`。
+
 ### 功能
 
-- 新增學生
-- 修改學生
+- 新增學生（需先選擇學員類型，再填寫對應欄位）
+- 修改學生（可切換類型，切換時清空原 profile 資料）
 - 停用學生
-- 搜尋學生
+- 搜尋學生（依姓名 / 學號 / 家長 / 公司 / 電話）
+- 篩選學員類型（全部 / 小朋友 / 成人）
 - 轉分校
 
 ---
