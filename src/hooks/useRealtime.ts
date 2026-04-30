@@ -113,7 +113,7 @@ export function useBranchDayAttendanceRealtime(branchId: string | undefined, dat
   );
 }
 
-// 課程方案：某分校某日的場次清單
+// 學程：某分校某日的場次清單
 export function useBranchDayCourseSessionsRealtime(branchId: string | undefined, date: string) {
   return useRealtime<CourseSessionDoc[]>(
     () => (branchId
@@ -124,7 +124,7 @@ export function useBranchDayCourseSessionsRealtime(branchId: string | undefined,
   );
 }
 
-// 課程方案：某分校某日的出席紀錄
+// 學程：某分校某日的出席紀錄
 export function useBranchDayCourseAttendanceRealtime(branchId: string | undefined, date: string) {
   return useRealtime<CourseAttendanceDoc[]>(
     () => (branchId

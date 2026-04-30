@@ -1,4 +1,4 @@
-// 課程方案新增 / 編輯表單
+// 學程新增 / 編輯表單
 
 import { useEffect, useState, type FormEvent } from 'react';
 
@@ -108,7 +108,7 @@ export function CourseFormDialog({ open, initial, onClose, onSaved }: CourseForm
   }
 
   return (
-    <Modal open={open} title={isEdit ? '編輯課程方案' : '新增課程方案'} onClose={onClose} width={680}>
+    <Modal open={open} title={isEdit ? '編輯學程' : '新增學程'} onClose={onClose} width={680}>
       <form onSubmit={handleSubmit}>
         {error && <div style={formStyles.error}>{error}</div>}
 
@@ -214,7 +214,7 @@ export function CourseFormDialog({ open, initial, onClose, onSaved }: CourseForm
           <label style={{ ...formStyles.label, display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <input type="checkbox" checked={active}
               onChange={(e) => setActive(e.target.checked)} disabled={submitting} />
-            啟用此課程方案
+            啟用此學程
           </label>
         </div>
 

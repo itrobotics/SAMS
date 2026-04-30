@@ -23,7 +23,15 @@
       "Bash(node scripts/seed-admin.mjs)",
       "Bash(node scripts/enable-email-auth.mjs)",
       "Bash(curl -sI https://ithink-sams.web.app)",
-      "Bash(git reset *)"
+      "Bash(git reset *)",
+      "Bash(npx firebase *)",
+      "Bash(git merge *)",
+      "Bash(git checkout *)",
+      "Bash(git restore *)",
+      "Bash(grep -o \"subscribeCourseSessionsForBranchDate\\\\|courseSessions:\\\\[\\\\]\\\\|class:\\\\\\\\\\\\${\\\\|course:\\\\\\\\\\\\${\" dist/assets/*.js)",
+      "Bash(xargs grep *)",
+      "Bash(node scripts/seed-course-students.mjs)",
+      "Bash(xargs sed *)"
     ]
   }
 }

@@ -62,7 +62,7 @@ export function subscribeCourseAttendanceForCourse(
   );
 }
 
-// 分校 dashboard 用：某分校 + 某日的所有課程方案出席紀錄
+// 分校 dashboard 用：某分校 + 某日的所有學程出席紀錄
 // 依賴 course_attendance.date 已 denormalize（openCourseSessionFromSlot 寫入時帶）
 export function subscribeCourseAttendanceForBranchDate(
   branchId: string,
@@ -82,7 +82,7 @@ export function subscribeCourseAttendanceForBranchDate(
   );
 }
 
-// HQ dashboard 用：某日跨分校所有課程方案出席紀錄
+// HQ dashboard 用：某日跨分校所有學程出席紀錄
 export function subscribeAllCourseAttendanceForDate(
   date: string,
   onChange: (list: CourseAttendanceDoc[]) => void,

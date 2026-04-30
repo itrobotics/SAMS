@@ -148,7 +148,7 @@ export function KioskPage() {
   const attendanceRT = useBranchDayAttendanceRealtime(branchId, today);
   const courseAttendanceRT = useBranchDayCourseAttendanceRealtime(branchId, today);
 
-  // 右側花名冊：合併班級 + 課程方案，帶 sessionKey/sessionLabel，按姓名排序
+  // 右側花名冊：合併班級 + 學程，帶 sessionKey/sessionLabel，按姓名排序
   const rosterStudents: RosterStudent[] = useMemo(() => {
     if (selectedSessions.size === 0) return [];
 
@@ -200,7 +200,7 @@ export function KioskPage() {
         sessionSubLabel: subLabelMap.get(sk) ?? '',
       });
     }
-    list.sort((a, b) => a.studentName.localeCompare(b.studentName, 'zh-Hant'));
+    list.sort((a, b) => a.studentName.localeCompare(b.studentName, 'zh-Hant-u-co-stroke'));
     return list;
   }, [
     attendanceRT.data, courseAttendanceRT.data, selectedSessions,
@@ -728,13 +728,22 @@ function StudentRoster({
                   ...(isActive ? styles.tabActive : null),
                 }}
               >
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{label}</div>
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 700, fontSize: '1.5rem', lineHeight: 1.2 }}>{label}</div>
                 {subLabel && (
-                  <div style={{ fontSize: '0.78rem', color: isActive ? '#bfdbfe' : '#64748b', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subLabel}</div>
+                  <div style={{ fontSize: '0.85rem', color: isActive ? '#bfdbfe' : '#64748b', marginTop: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subLabel}</div>
                 )}
                 {stats && (
-                  <div style={styles.tabStats}>
-                    {stats.checkedIn}/{stats.total} 已到
+                  <div style={{
+                    marginTop: '0.4rem',
+                    display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span style={{ background: isActive ? '#1e40af' : '#0f172a', border: `1px solid ${isActive ? '#93c5fd' : '#334155'}`, borderRadius: 6, padding: '0.15rem 0.55rem', fontSize: '1rem', fontWeight: 700, color: isActive ? '#fff' : '#94a3b8' }}>
+                      已到 {stats.checkedIn}
+                    </span>
+                    <span style={{ color: isActive ? '#bfdbfe' : '#475569', fontSize: '0.85rem' }}>/</span>
+                    <span style={{ background: isActive ? '#1e3a8a' : '#0f172a', border: `1px solid ${isActive ? '#60a5fa' : '#1e293b'}`, borderRadius: 6, padding: '0.15rem 0.55rem', fontSize: '1rem', fontWeight: 700, color: isActive ? '#e0f2fe' : '#64748b' }}>
+                      應到 {stats.total}
+                    </span>
                   </div>
                 )}
               </button>
@@ -764,8 +773,8 @@ function RosterGrid({ students }: { students: RosterStudent[] }) {
   }
 
   const n = cols.length;
-  const nameFz = n <= 2 ? '1rem' : n <= 3 ? '0.9rem' : n <= 5 ? '0.8rem' : n <= 7 ? '0.7rem' : '0.62rem';
-  const idFz = n <= 2 ? '0.78rem' : n <= 4 ? '0.7rem' : '0.6rem';
+  const nameFz = n <= 2 ? '1.3rem' : n <= 3 ? '1.15rem' : n <= 5 ? '1rem' : n <= 7 ? '0.88rem' : '0.78rem';
+  const idFz   = n <= 2 ? '0.7rem'  : n <= 4 ? '0.65rem' : '0.58rem';
 
   return (
     <div style={{
@@ -1074,7 +1083,7 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center' as const,
     lineHeight: 1.3,
     minWidth: 0,
-    minHeight: 68,
+    minHeight: 100,
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center',

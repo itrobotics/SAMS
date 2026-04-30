@@ -1,8 +1,8 @@
-// 課程方案場次出席管理頁
+// 學程場次出席管理頁
 //
 // /courses/:courseId/sessions/:courseSessionId
 // 列出本場次所有 course_attendance；老師可逐位切「應到 / 已到 / 遲到 / 請假 / 未到」。
-// 頂部提供「標記為已完成」/「標記為取消」按鈕，狀態為 'completed' 才會計入課程方案實際時數。
+// 頂部提供「標記為已完成」/「標記為取消」按鈕，狀態為 'completed' 才會計入學程實際時數。
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
@@ -116,7 +116,7 @@ export function CourseSessionPage() {
       completed: '已完成',
       cancelled: '已取消',
     };
-    if (!window.confirm(`將本場次狀態改為「${labels[target]}」？\n${target === 'completed' ? '時數會計入課程方案實際時數。' : ''}`)) return;
+    if (!window.confirm(`將本場次狀態改為「${labels[target]}」？\n${target === 'completed' ? '時數會計入學程實際時數。' : ''}`)) return;
     setBusyId('__session__');
     try {
       await updateCourseSession(courseSessionId, { status: target });
@@ -141,7 +141,7 @@ export function CourseSessionPage() {
       <section>
         <h1>找不到場次</h1>
         <p><code>{courseSessionId}</code> 不存在。</p>
-        <Link to={courseId ? ROUTES.courseDetail(courseId) : ROUTES.courses}>← 回課程方案</Link>
+        <Link to={courseId ? ROUTES.courseDetail(courseId) : ROUTES.courses}>← 回學程</Link>
       </section>
     );
   }
@@ -161,7 +161,7 @@ export function CourseSessionPage() {
       <header style={styles.header}>
         <div style={{ flex: 1 }}>
           <Link to={ROUTES.courseDetail(session.courseId)} style={styles.back}>
-            ← 回課程方案
+            ← 回學程
           </Link>
           <h1 style={styles.title}>
             {courseDisplay}
@@ -232,7 +232,7 @@ export function CourseSessionPage() {
             {records.length === 0 && (
               <tr>
                 <td colSpan={4} style={styles.empty}>
-                  此場次尚無學員。請先在課程方案加入學員，再重新建立場次。
+                  此場次尚無學員。請先在學程加入學員，再重新建立場次。
                 </td>
               </tr>
             )}

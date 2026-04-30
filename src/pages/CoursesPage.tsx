@@ -1,6 +1,6 @@
-// 課程方案列表頁
+// 學程列表頁
 //
-// 與 ClassesPage 並列：班級是固定週期循環、課程方案是有總時數目標的長期課程。
+// 與 ClassesPage 並列：班級是固定週期循環、學程是有總時數目標的長期課程。
 // 顯示計畫總時數 / 實際完成時數 / 進度% / 學員數 / 單元數。
 //
 // 權限：HQ 看全部、Branch Admin 看本分校、Teacher 只看自己是 defaultInstructor 的。
@@ -50,7 +50,7 @@ export function CoursesPage() {
 
   async function toggleActive(c: CourseDoc) {
     const next = !c.active;
-    if (!window.confirm(`確定要${next ? '啟用' : '停用'}課程方案「${c.name}」？`)) return;
+    if (!window.confirm(`確定要${next ? '啟用' : '停用'}學程「${c.name}」？`)) return;
     setBusyId(c.courseId);
     try {
       await setCourseActive(c.courseId, next);
@@ -106,12 +106,12 @@ export function CoursesPage() {
     <section>
       <header style={styles.header}>
         <div>
-          <h1 style={styles.title}>課程方案管理</h1>
-          <p style={styles.subtitle}>共 {visible.length} 個課程方案</p>
+          <h1 style={styles.title}>學程管理</h1>
+          <p style={styles.subtitle}>共 {visible.length} 個學程</p>
         </div>
         {user?.role !== 'teacher' && (
           <button type="button" style={styles.primaryBtn} onClick={openCreate}>
-            ＋ 新增課程方案
+            ＋ 新增學程
           </button>
         )}
       </header>
@@ -175,7 +175,7 @@ export function CoursesPage() {
               <tr><td colSpan={11} style={styles.empty}>載入中…</td></tr>
             )}
             {!loading && visible.length === 0 && (
-              <tr><td colSpan={11} style={styles.empty}>沒有符合條件的課程方案</td></tr>
+              <tr><td colSpan={11} style={styles.empty}>沒有符合條件的學程</td></tr>
             )}
             {visible.map((c) => {
               const planned = c.totalPlannedHours || 0;

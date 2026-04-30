@@ -1,7 +1,7 @@
 // course_sessions collection 型別定義
 //
-// 「課程方案場次」與「班級場次（sessions）」分離。班級的場次是依 weekday 自動產生，
-// 課程方案的場次則由人工排：每場記錄日期、時間、實際時數、講師、教室。
+// 「學程場次」與「班級場次（sessions）」分離。班級的場次是依 weekday 自動產生，
+// 學程的場次則由人工排：每場記錄日期、時間、實際時數、講師、教室。
 //
 // Firestore 路徑：`course_sessions/{courseSessionId}`，格式 `CS000001`。
 // hours 由前端自動計算（endTime - startTime），亦可手動調整。
