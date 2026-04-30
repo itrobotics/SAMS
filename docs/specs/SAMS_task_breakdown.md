@@ -1208,6 +1208,178 @@ ClassesPage 與 InstructorSchedulePage 原本各自實作「今日 / 本週 / �
 
 ---
 
+# Phase 17｜課程方案模組（CRS / MOD / CS）
+
+> 與「班級（Classes）」並列的第二種授課型態：有總時數目標、固定一批學員、不一定固定週期的長期課程。
+
+## Tasks
+
+### Task 067｜課程方案核心架構
+
+#### 三層資料模型
+
+| 層次 | Collection | ID 前綴 | 說明 |
+|---|---|---|---|
+| 課程方案 | `courses` | `CRS00001` | 最上層，含總規劃時數、狀態 |
+| 課程單元 | `course_modules` | `MOD00001` | 屬於某 course，含排課 slots 陣列 |
+| 課程場次 | `course_sessions` | `CS000001` | 從 slot「開啟報到」後產生，才可打卡 |
+
+#### 額外 Collections
+
+- `course_enrollments` — `CRS00001__STU001`，記錄哪個學生報名哪個 course
+- `course_attendance` — 課程場次出席紀錄，狀態同班級（SCHEDULED / CHECKED_IN / LATE / ABSENT…）
+
+#### 頁面
+
+- `CoursesPage`（`/courses`）— 課程方案列表，含新增/編輯/停用
+- `CourseDetailPage`（`/courses/:courseId`）— 課程方案詳情，含：
+  - 基本資料（名稱、分校、總規劃時數、狀態）
+  - 課程單元管理（新增/編輯 MOD，slots 陣列排課）
+  - 學員管理（加入/移除學員，enrollment 狀態）
+  - 每個單元可對指定 slot「開啟報到」→ 建立 CourseSession（CS）
+
+#### 規則
+
+- CourseSession 僅在「開啟報到」時手動建立，不自動產生
+- 出席預設 SCHEDULED，流程同班級場次
+- 實際時數由已完成（`status: completed`）的 CourseSession 累加
+
+#### 新增 / 修改檔案
+
+- `src/types/course.ts`、`src/types/courseModule.ts`、`src/types/courseSession.ts`
+- `src/types/courseEnrollment.ts`、`src/types/courseAttendance.ts`
+- `src/services/courses.ts`、`src/services/courseModules.ts`、`src/services/courseSessions.ts`
+- `src/services/courseEnrollments.ts`、`src/services/courseAttendance.ts`
+- `src/pages/CoursesPage.tsx`、`src/pages/CourseDetailPage.tsx`
+- `src/pages/CourseSessionPage.tsx` — 課程場次出席管理（同 SessionPage）
+- `src/components/CourseFormDialog.tsx`、`src/components/AppLayout.tsx`（新增「課程方案」nav）
+- `firestore.rules` — 補 courses / course_modules / course_sessions / course_enrollments / course_attendance 規則
+
+---
+
+### Task 068｜課程方案場次整合 Dashboard + Kiosk
+
+#### 功能
+
+- **分校 Dashboard**：今日課程方案場次（`branchId + date` 查詢）+ 應到/已到統計，與班級場次並列
+- **HQ Dashboard**：今日跨分校課程方案場次統計合入總表
+- **Kiosk Session Selector**：課程方案場次納入勾選清單，與班級場次並列
+  - session key 前綴區分：`class:${sessionId}` / `course:${courseSessionId}`
+  - 預設自動勾選「進行中或即將開始」場次
+- **Kiosk 打卡邏輯**：
+  - 比對範圍同時包含班級 + 課程方案的應到名單
+  - 命中後同時更新 `attendance`（班級）+ `course_attendance`（課程方案）
+
+#### 新增 / 修改檔案
+
+- `src/hooks/useRealtime.ts` — 新增 `useBranchDayCourseSessionsRealtime`、`useBranchDayCourseAttendanceRealtime`
+- `src/pages/BranchDashboardPage.tsx`、`src/pages/HQDashboardPage.tsx`
+- `src/components/KioskSessionSelector.tsx`
+- `src/hooks/useKioskCheckin.ts`、`src/pages/KioskPage.tsx`
+
+---
+
+### Task 069｜課程方案名稱顯示優化
+
+**問題**：KioskSessionSelector 的 CourseRow 及 CourseSessionPage 原本只顯示 ID（CRS00001 / MOD00001 / T001），操作者需要背誦代碼。
+
+**改動**：
+- `KioskSessionSelector.tsx` CourseRow：訂閱 `courses` + `course_modules` + `instructors`，顯示三行人類可讀資訊：
+  - 課程名稱 [CRS00001]
+  - 單元名稱 [MOD00001]
+  - 時間 · 教室 · 講師姓名
+- `CourseSessionPage.tsx` header：重構為三行結構（課程名 + 單元名 + 場次詳情）
+
+---
+
+### Task 070｜課程方案詳情頁排課清單
+
+在 `CourseDetailPage` 的「課程單元」與「學員名單」之間加入「排課清單」區塊。
+
+#### 顯示格式
+
+- 三種檢視 Toggle：**按日期** / **按單元** / **按講師**
+- 每列顯示：日期（含星期）、時間、時數、單元名、講師、教室、是否已開報到（有 CourseSession）
+- 中文星期：`weekdayZh()` util
+
+#### 新增 / 修改檔案
+
+- `src/pages/CourseDetailPage.tsx` — 新增 `CourseScheduleCard` component、`ScheduleRow` interface、`weekdayZh()` util
+
+---
+
+# Phase 18｜Kiosk UI 改版
+
+## Tasks
+
+### Task 071｜Kiosk 左右分割佈局 + 手動辨識模式
+
+#### 版面
+
+```
+┌────────────── 38% ──────────────┬──────────────── 62% ───────────────┐
+│  [手動辨識] [自動辨識]           │  Tab: 課程名                        │
+│  ┌────────────────────────┐     │       單元名(ID)                     │
+│  │       Camera           │     │       已到 8 / 應到 20               │
+│  └────────────────────────┘     ├────────────────────────────────────┤
+│  ▶ 辨識（手動模式才出現）        │  STU001 陳小明  STU002 林俊傑  ...  │
+└─────────────────────────────────┴────────────────────────────────────┘
+```
+
+#### 手動 / 自動模式切換
+
+- 預設「手動模式」：不啟動 1 秒掃描 timer，顯示「▶ 辨識」按鈕
+- 按「▶ 辨識」→ 呼叫 `triggerScan()`（`useKioskCheckin` 新增）執行一次辨識
+- 切換為「自動辨識」→ 啟動自動 timer，按鈕隱藏
+
+#### 新增 / 修改檔案
+
+- `src/hooks/useKioskCheckin.ts` — 新增 `manualMode: boolean`（args）與 `triggerScan: () => void`（return）
+- `src/pages/KioskPage.tsx` — 新增 `manualMode` state、`ModeToggle` component、`scanBtn` 樣式
+
+---
+
+### Task 072｜Kiosk 多 Session Tab 花名冊
+
+**場景**：同一 Kiosk 同時選取兩個（或多個）session（如兩間教室各自上課）時，右側花名冊需要按 session 分開顯示。
+
+#### 設計
+
+- `RosterStudent` 新增 `sessionKey` / `sessionLabel` / `sessionSubLabel`
+- `StudentRoster` 拆成 `TabBar` + `RosterGrid` 兩層
+- Tab 永遠顯示（即使只有一個 session）以作為課程標題
+
+#### Tab 顯示
+
+- 第 1 行：課程名（班名 or 課程方案名），`1.5rem bold`
+- 第 2 行：單元名(MOD ID) or 時間範圍，`0.85rem`
+- 第 3 行：`已到 N` / `應到 M` 兩個 badge
+
+#### 自動切換 Tab
+
+- 辨識命中（`match` 變更）→ 自動切換到包含該學生的第一個 Tab
+
+#### 新增 / 修改檔案
+
+- `src/pages/KioskPage.tsx` — `RosterStudent` interface 擴充、`StudentRoster`、`RosterGrid`、`activeRosterTab` state + 兩個 useEffect
+
+---
+
+### Task 073｜Kiosk 花名冊一頁呈現
+
+**問題**：原先 `shell` 使用 `minHeight: 100vh`，頁面可超出視窗高度，造成瀏覽器 scrollbar。
+
+#### 改動
+
+| 項目 | 改法 |
+|---|---|
+| **消除 scrollbar** | `shell` 改為 `height: 100vh; overflow: hidden` |
+| **動態欄數** | `numCols = ceil(N / 10)`，上限 12，所有學生一頁完整顯示 |
+| **學生卡片** | 水平排列：學號（灰小，左，`flexShrink:0`）+ 姓名（白粗，右，`flex:1`） |
+| **排列順序** | `localeCompare('zh-Hant-u-co-stroke')`（按筆劃由少到多） |
+
+---
+
 # 建議開發順序總表
 
 | Phase | 名稱 | 優先度 |
@@ -1229,6 +1401,8 @@ ClassesPage 與 InstructorSchedulePage 原本各自實作「今日 / 本週 / �
 | Phase 14 | 系統設定 | P2 |
 | Phase 15 | 測試與上線 | P0 |
 | Phase 16 | MVP 後續優化（Task 045-066：選項管理、講師、地址、班級擴充、定價、期間 filter） | P2 |
+| Phase 17 | 課程方案模組（Task 067-070：CRS/MOD/CS 三層、Dashboard 整合、名稱顯示、排課清單） | P1 |
+| Phase 18 | Kiosk UI 改版（Task 071-073：左右分割、手動辨識、多 Session Tab、一頁花名冊） | P1 |
 
 ---
 
