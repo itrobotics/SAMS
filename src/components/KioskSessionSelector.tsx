@@ -9,15 +9,21 @@
 //   - `class:${sessionId}` 班級場次
 //   - `course:${courseSessionId}` 課程方案場次
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   useBranchDayCourseSessionsRealtime,
   useBranchDaySessionsRealtime,
 } from '../hooks/useRealtime';
+import { subscribeCourses } from '../services/courses';
+import { subscribeCourseModulesForBranch } from '../services/courseModules';
+import { subscribeInstructors } from '../services/instructors';
 import { todayISO, timeToMinutes } from '../utils/date';
 import type { SessionDoc } from '../types/session';
 import type { CourseSessionDoc } from '../types/courseSession';
+import type { CourseDoc } from '../types/course';
+import type { CourseModuleDoc } from '../types/courseModule';
+import type { InstructorDoc } from '../types/instructor';
 
 interface KioskSessionSelectorProps {
   branchId: string;
@@ -48,6 +54,33 @@ export function KioskSessionSelector({
   const { data: sessions, loading } = useBranchDaySessionsRealtime(branchId, today);
   const { data: courseSessions, loading: courseLoading } =
     useBranchDayCourseSessionsRealtime(branchId, today);
+
+  // 給 CourseRow 顯示「課程名稱 / 單元名稱 / 講師名稱」用的對照表
+  const [courses, setCourses] = useState<CourseDoc[]>([]);
+  const [modules, setModules] = useState<CourseModuleDoc[]>([]);
+  const [instructors, setInstructors] = useState<InstructorDoc[]>([]);
+  useEffect(() => {
+    if (!branchId) return;
+    return subscribeCourses({ branchIds: [branchId] }, setCourses);
+  }, [branchId]);
+  useEffect(() => {
+    if (!branchId) return;
+    return subscribeCourseModulesForBranch(branchId, setModules);
+  }, [branchId]);
+  useEffect(() => subscribeInstructors({}, setInstructors), []);
+
+  const courseNameMap = useMemo(
+    () => new Map(courses.map((c) => [c.courseId, c.name])),
+    [courses],
+  );
+  const moduleNameMap = useMemo(
+    () => new Map(modules.map((m) => [m.moduleId, m.name])),
+    [modules],
+  );
+  const instructorNameMap = useMemo(
+    () => new Map(instructors.map((t) => [t.instructorId, t.name])),
+    [instructors],
+  );
 
   const inWindow = useMemo(() => {
     const nowMin = nowMinutes();
@@ -113,6 +146,9 @@ export function KioskSessionSelector({
                   active={inWindow(s)}
                   isChecked={selected.has(courseKey(s.courseSessionId))}
                   onToggle={() => onToggle(courseKey(s.courseSessionId))}
+                  courseName={courseNameMap.get(s.courseId)}
+                  moduleName={moduleNameMap.get(s.moduleId)}
+                  instructorName={instructorNameMap.get(s.instructorId)}
                 />
               ))}
             </SessionGroup>
@@ -179,12 +215,19 @@ function ClassRow({
 
 function CourseRow({
   session, active, isChecked, onToggle,
+  courseName, moduleName, instructorName,
 }: {
   session: CourseSessionDoc;
   active: boolean;
   isChecked: boolean;
   onToggle: () => void;
+  courseName?: string;
+  moduleName?: string;
+  instructorName?: string;
 }) {
+  const instructorLabel = session.instructorId
+    ? (instructorName ? `${session.instructorId}-${instructorName}` : session.instructorId)
+    : null;
   return (
     <li
       style={{ ...styles.row, ...(isChecked ? styles.rowSelected : null) }}
@@ -199,15 +242,22 @@ function CourseRow({
       />
       <div style={styles.rowMain}>
         <div style={styles.rowTitle}>
-          <code style={{ fontSize: '0.95rem' }}>{session.courseSessionId}</code>
-          <span style={{ marginLeft: '0.5rem', color: '#cbd5e1' }}>
-            {session.courseId}{session.moduleId ? ` · ${session.moduleId}` : ''}
-          </span>
+          {courseName ?? session.courseId}
+          <code style={styles.idInline}>{session.courseId}</code>
         </div>
+        {session.moduleId && (
+          <div style={styles.rowSubtitle}>
+            {moduleName ?? session.moduleId}
+            <code style={styles.idInline}>{session.moduleId}</code>
+          </div>
+        )}
         <div style={styles.rowMeta}>
           {session.startTime}–{session.endTime}
           {session.classroom ? ` · 教室 ${session.classroom}` : ''}
-          {session.instructorId ? ` · 講師 ${session.instructorId}` : ''}
+          {instructorLabel ? ` · 講師 ${instructorLabel}` : ''}
+          <span style={{ marginLeft: '0.4rem', color: '#64748b' }}>
+            <code>{session.courseSessionId}</code>
+          </span>
         </div>
       </div>
       {active && <span style={styles.activeBadge}>進行中</span>}
@@ -279,8 +329,14 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer', transition: 'background 0.15s',
   },
   rowSelected: { background: '#1d4ed8' },
-  rowMain: { flex: 1 },
+  rowMain: { flex: 1, minWidth: 0 },
   rowTitle: { fontSize: '1rem', fontWeight: 500 },
+  rowSubtitle: { fontSize: '0.92rem', color: '#e2e8f0', marginTop: '0.15rem' },
+  idInline: {
+    marginLeft: '0.45rem', padding: '0.05rem 0.35rem',
+    background: '#0f172a', borderRadius: 4,
+    color: '#94a3b8', fontSize: '0.75rem', fontWeight: 400,
+  },
   rowMeta: { color: '#cbd5e1', fontSize: '0.85rem', marginTop: '0.2rem' },
   activeBadge: {
     padding: '0.15rem 0.55rem', borderRadius: 12, fontSize: '0.75rem',

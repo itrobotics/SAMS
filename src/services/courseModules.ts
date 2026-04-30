@@ -76,6 +76,23 @@ export function subscribeCourseModules(
   );
 }
 
+// Kiosk / Branch dashboard 用：某分校所有 modules（給 ID→name 對照）
+export function subscribeCourseModulesForBranch(
+  branchId: string,
+  onChange: (list: CourseModuleDoc[]) => void,
+  onError?: (e: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(db, COURSE_MODULES_COLLECTION),
+    where('branchId', '==', branchId),
+  );
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map(snapshotToModule)),
+    (err) => onError?.(err),
+  );
+}
+
 export async function createCourseModule(input: NewCourseModuleInput): Promise<void> {
   if (!input.moduleId.trim()) throw new Error('單元代碼不可為空');
   if (!input.courseId.trim()) throw new Error('缺少課程代碼');

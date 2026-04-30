@@ -16,6 +16,9 @@ import {
   updateCourseAttendance,
 } from '../services/courseAttendance';
 import { updateCourseSession } from '../services/courseSessions';
+import { fetchCourse } from '../services/courses';
+import { fetchCourseModule } from '../services/courseModules';
+import { fetchInstructor } from '../services/instructors';
 import { ROUTES } from '../routes/paths';
 import { formatTimeWithSec } from '../utils/date';
 import { canAccessBranch } from '../types/user';
@@ -25,6 +28,8 @@ import {
   type CourseSessionDoc,
   type CourseSessionStatus,
 } from '../types/courseSession';
+import type { CourseDoc } from '../types/course';
+import type { CourseModuleDoc } from '../types/courseModule';
 import {
   COURSE_ATTENDANCE_STATUSES,
   COURSE_ATTENDANCE_STATUS_COLORS,
@@ -42,6 +47,11 @@ export function CourseSessionPage() {
   const [records, setRecords] = useState<CourseAttendanceDoc[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // 顯示用的 metadata（從 session 上的 ID 一次撈出來）
+  const [course, setCourse] = useState<CourseDoc | null>(null);
+  const [module, setModule] = useState<CourseModuleDoc | null>(null);
+  const [instructorName, setInstructorName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!courseSessionId) return;
@@ -63,6 +73,24 @@ export function CourseSessionPage() {
     if (!courseSessionId) return;
     return subscribeCourseAttendance(courseSessionId, setRecords, (e) => setError(e.message));
   }, [courseSessionId]);
+
+  // 撈 course / module / instructor 用以顯示完整名稱
+  useEffect(() => {
+    if (!session || session === 'missing') return;
+    fetchCourse(session.courseId).then(setCourse).catch(() => {});
+    if (session.moduleId) {
+      fetchCourseModule(session.moduleId).then(setModule).catch(() => {});
+    } else {
+      setModule(null);
+    }
+    if (session.instructorId) {
+      fetchInstructor(session.instructorId)
+        .then((i) => setInstructorName(i?.name ?? null))
+        .catch(() => {});
+    } else {
+      setInstructorName(null);
+    }
+  }, [session]);
 
   async function setStatus(rec: CourseAttendanceDoc, target: CourseAttendanceStatus) {
     setBusyId(rec.attendanceId);
@@ -122,6 +150,11 @@ export function CourseSessionPage() {
   }
 
   const branchName = branches.find((b) => b.branchId === session.branchId)?.name ?? session.branchId;
+  const courseDisplay = course?.name ?? session.courseId;
+  const moduleDisplay = module?.name ?? session.moduleId;
+  const instructorLabel = session.instructorId
+    ? (instructorName ? `${session.instructorId}-${instructorName}` : session.instructorId)
+    : null;
 
   return (
     <section>
@@ -130,12 +163,22 @@ export function CourseSessionPage() {
           <Link to={ROUTES.courseDetail(session.courseId)} style={styles.back}>
             ← 回課程方案
           </Link>
-          <h1 style={styles.title}>場次報到</h1>
+          <h1 style={styles.title}>
+            {courseDisplay}
+            <code style={styles.idInline}>{session.courseId}</code>
+          </h1>
+          {session.moduleId && (
+            <p style={styles.moduleLine}>
+              {moduleDisplay}
+              <code style={styles.idInline}>{session.moduleId}</code>
+              {instructorLabel && <span style={{ marginLeft: '0.5rem' }}>講師 {instructorLabel}</span>}
+            </p>
+          )}
           <p style={styles.subtitle}>
             {branchName} · {session.date} · {session.startTime}–{session.endTime}
             {' · 時數 '}{session.hours}
             {session.classroom ? ` · 教室 ${session.classroom}` : ''}
-            {session.instructorId ? ` · 講師 ${session.instructorId}` : ''}
+            {!session.moduleId && instructorLabel ? ` · 講師 ${instructorLabel}` : ''}
             {' · '}<code>{session.courseSessionId}</code>
             {' · '}<SessionStatusPill status={session.status} />
           </p>
@@ -345,6 +388,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   back: { color: '#6b7280', fontSize: '0.9rem', display: 'inline-block', marginBottom: '0.5rem' },
   title: { margin: 0, fontSize: '1.5rem' },
+  moduleLine: {
+    margin: '0.25rem 0 0', fontSize: '1rem', color: '#374151',
+  },
+  idInline: {
+    marginLeft: '0.45rem', padding: '0.05rem 0.45rem',
+    background: '#f3f4f6', borderRadius: 4,
+    color: '#6b7280', fontSize: '0.75rem', fontWeight: 400,
+  },
   subtitle: { margin: '0.4rem 0 0', color: '#6b7280', fontSize: '0.9rem' },
   notes: { margin: '0.3rem 0 0', color: '#374151', fontSize: '0.85rem', whiteSpace: 'pre-wrap' },
   error: {
