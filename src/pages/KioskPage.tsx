@@ -11,10 +11,8 @@
 //   SUCCESS       → 報到成功，顯示姓名 + 時間（3 秒後回 IDLE）
 //   FAILED        → 信心值不足或無臉，提示請老師協助
 //   MANUAL        → 老師接手手動搜尋（Task 040 實作）
-//
-// 本任務只實作 state machine + 各狀態的 UI；攝影機接 Task 030、辨識接 Task 036。
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import {
@@ -37,7 +35,11 @@ import { ROUTES } from '../routes/paths';
 import { updateAttendance } from '../services/attendance';
 import { updateCourseAttendance } from '../services/courseAttendance';
 import { logFaceAttempt, deriveDeviceId } from '../services/faceCheckinAttempts';
+import { subscribeCourses } from '../services/courses';
+import { subscribeCourseModulesForBranch } from '../services/courseModules';
 import { subscribeBranchSettings } from '../services/settings';
+import type { CourseDoc } from '../types/course';
+import type { CourseModuleDoc } from '../types/courseModule';
 import { decideManualCheckinStatus } from '../utils/attendance';
 import { makeRecordId } from '../types/attendance';
 import { courseAttendanceDocId } from '../types/courseAttendance';
@@ -60,27 +62,38 @@ export interface KioskMatch {
   recordedAt: Date;
 }
 
+// ─── 花名冊學生資料 ───────────────────────────────────────
+interface RosterStudent {
+  key: string;
+  studentId: string;
+  studentName: string;
+  status: string;
+  sessionKey: string;
+  sessionLabel: string;    // Tab 第 1 行（課程名 or 班名）
+  sessionSubLabel: string; // Tab 第 2 行（單元名(ID) or 時間範圍）
+}
+
+// ─── KioskPage ────────────────────────────────────────────
 export function KioskPage() {
   const { branchId } = useParams<{ branchId: string }>();
   const { branches, loading: branchesLoading } = useBranches();
   const { user } = useAuth();
   const branch = branches.find((b) => b.branchId === branchId);
   const branchName = branch?.name ?? branchId;
-  // branches 載入完成後若 branchId 不在清單裡，視為 URL 拼錯
   const branchUnknown = !branchesLoading && branches.length > 0 && !branch;
 
-  // 暫時的 demo 狀態 — Task 036 會把 setState 接上實際事件
   const [state, setState] = useState<KioskState>('IDLE');
   const [match, setMatch] = useState<KioskMatch | null>(null);
   const [now, setNow] = useState(new Date());
+  const [manualMode, setManualMode] = useState(true);
+  const [activeRosterTab, setActiveRosterTab] = useState<string | null>(null);
 
-  // 已勾選的場次（complex key：'class:xxx' / 'course:xxx'）
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
   const today = todayISO();
   const todaySessionsRT = useBranchDaySessionsRealtime(branchId, today);
   const todayCourseSessionsRT = useBranchDayCourseSessionsRealtime(branchId, today);
 
-  // 第一次載入完成、selected 還是空時，自動勾選「進行中」場次（含課程方案）
+  // 第一次載入完成後，自動勾選「進行中」場次
   useEffect(() => {
     if (todaySessionsRT.loading || todayCourseSessionsRT.loading) return;
     if (selectedSessions.size > 0) return;
@@ -109,27 +122,96 @@ export function KioskPage() {
     setState('READY');
   }
 
-  // 攝影機只有在已選定 session（IDLE 之後）才開啟，避免一打開頁面就要權限
   const cameraEnabled = state !== 'IDLE';
   const webcam = useWebcam({ enabled: cameraEnabled, width: 1280, height: 720 });
 
-  // 訂閱分校設定（取 graceMinutes — 報到時間判定）
   const [settings, setSettings] = useState<BranchSettings | null>(null);
   useEffect(() => {
     if (!branchId) return;
-    const unsub = subscribeBranchSettings(branchId, setSettings);
-    return unsub;
+    return subscribeBranchSettings(branchId, setSettings);
   }, [branchId]);
 
-  // 訂閱今日所有 attendance（班級 + 課程方案）給辨識迴圈與手動 fallback 用
+  // 課程 / 單元名稱對照（給 course session Tab 標籤用）
+  const [courses, setCourses] = useState<CourseDoc[]>([]);
+  const [modules, setModules] = useState<CourseModuleDoc[]>([]);
+  useEffect(() => {
+    if (!branchId) return;
+    return subscribeCourses({ branchIds: [branchId] }, setCourses);
+  }, [branchId]);
+  useEffect(() => {
+    if (!branchId) return;
+    return subscribeCourseModulesForBranch(branchId, setModules);
+  }, [branchId]);
+  const courseNameMap = useMemo(() => new Map(courses.map((c) => [c.courseId, c.name])), [courses]);
+  const moduleNameMap = useMemo(() => new Map(modules.map((m) => [m.moduleId, m.name])), [modules]);
+
   const attendanceRT = useBranchDayAttendanceRealtime(branchId, today);
   const courseAttendanceRT = useBranchDayCourseAttendanceRealtime(branchId, today);
 
-  // === manual fallback 候選名單 — 班級 + 課程方案合併 ===
+  // 右側花名冊：合併班級 + 課程方案，帶 sessionKey/sessionLabel，按姓名排序
+  const rosterStudents: RosterStudent[] = useMemo(() => {
+    if (selectedSessions.size === 0) return [];
+
+    // 建立 sessionKey → 第 1 行標籤 / 第 2 行標籤 對照表
+    const labelMap = new Map<string, string>();
+    const subLabelMap = new Map<string, string>();
+    for (const s of todaySessionsRT.data) {
+      const k = classKey(s.sessionId);
+      if (!selectedSessions.has(k)) continue;
+      labelMap.set(k, s.className);
+      subLabelMap.set(k, `${s.startTime}–${s.endTime}${s.classroom ? ' · ' + s.classroom : ''}`);
+    }
+    for (const s of todayCourseSessionsRT.data) {
+      const k = courseKey(s.courseSessionId);
+      if (!selectedSessions.has(k)) continue;
+      labelMap.set(k, courseNameMap.get(s.courseId) ?? s.courseId);
+      if (s.moduleId) {
+        const mName = moduleNameMap.get(s.moduleId) ?? s.moduleId;
+        subLabelMap.set(k, `${mName}(${s.moduleId})${s.classroom ? ' · ' + s.classroom : ''}`);
+      } else {
+        subLabelMap.set(k, s.classroom ?? '');
+      }
+    }
+
+    const list: RosterStudent[] = [];
+    for (const r of attendanceRT.data) {
+      const sk = classKey(r.sessionId);
+      if (!selectedSessions.has(sk)) continue;
+      list.push({
+        key: `cls:${r.sessionId}:${r.studentId}`,
+        studentId: r.studentId,
+        studentName: r.studentName,
+        status: r.status,
+        sessionKey: sk,
+        sessionLabel: labelMap.get(sk) ?? r.sessionId,
+        sessionSubLabel: subLabelMap.get(sk) ?? '',
+      });
+    }
+    for (const r of courseAttendanceRT.data) {
+      const sk = courseKey(r.courseSessionId);
+      if (!selectedSessions.has(sk)) continue;
+      list.push({
+        key: `crs:${r.courseSessionId}:${r.studentId}`,
+        studentId: r.studentId,
+        studentName: r.studentName,
+        status: r.status,
+        sessionKey: sk,
+        sessionLabel: labelMap.get(sk) ?? r.courseSessionId,
+        sessionSubLabel: subLabelMap.get(sk) ?? '',
+      });
+    }
+    list.sort((a, b) => a.studentName.localeCompare(b.studentName, 'zh-Hant'));
+    return list;
+  }, [
+    attendanceRT.data, courseAttendanceRT.data, selectedSessions,
+    todaySessionsRT.data, todayCourseSessionsRT.data,
+    courseNameMap, moduleNameMap,
+  ]);
+
+  // 手動報到候選名單（尚未報到）
   const manualCandidates: ManualCandidate[] = (() => {
     if (selectedSessions.size === 0) return [];
     const list: ManualCandidate[] = [];
-    // 班級
     for (const r of attendanceRT.data) {
       if (!selectedSessions.has(classKey(r.sessionId))) continue;
       if (r.status === 'CHECKED_IN' || r.status === 'LATE' || r.status === 'MAKEUP') continue;
@@ -143,7 +225,6 @@ export function KioskPage() {
         status: r.status,
       });
     }
-    // 課程方案
     for (const r of courseAttendanceRT.data) {
       if (!selectedSessions.has(courseKey(r.courseSessionId))) continue;
       if (r.status === 'CHECKED_IN' || r.status === 'LATE') continue;
@@ -153,9 +234,7 @@ export function KioskPage() {
         studentId: r.studentId,
         studentName: r.studentName,
         targetId: r.courseSessionId,
-        sessionLabel: session
-          ? `${session.courseSessionId} ${session.startTime}`
-          : r.courseSessionId,
+        sessionLabel: session ? `${session.courseSessionId} ${session.startTime}` : r.courseSessionId,
         status: r.status,
       });
     }
@@ -190,7 +269,6 @@ export function KioskPage() {
         setCheckinNow: true,
       });
     } else {
-      // 課程方案沒有 graceMinutes 自動判定遲到 — 一律 CHECKED_IN
       await updateCourseAttendance(courseAttendanceDocId(c.targetId, c.studentId), {
         status: 'CHECKED_IN',
         operatorId: user?.userId ?? null,
@@ -208,18 +286,13 @@ export function KioskPage() {
       scopeProfileCount: 0,
       operatorId: user?.userId ?? null,
     });
-    setMatch({
-      studentId: c.studentId,
-      studentName: c.studentName,
-      confidence: 1,
-      recordedAt: new Date(),
-    });
+    setMatch({ studentId: c.studentId, studentName: c.studentName, confidence: 1, recordedAt: new Date() });
     setState('SUCCESS');
   }
 
-  // 啟動辨識 loop（READY 狀態時運作）
   const checkin = useKioskCheckin({
     enabled: state === 'READY' || state === 'SCANNING',
+    manualMode,
     webcam,
     branchId: branchId ?? '',
     selectedSessions,
@@ -235,13 +308,11 @@ export function KioskPage() {
     operatorId: user?.userId ?? null,
   });
 
-  // 大時鐘
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  // SUCCESS 顯示 3 秒後回 IDLE
   useEffect(() => {
     if (state !== 'SUCCESS' && state !== 'FAILED') return;
     const t = setTimeout(() => {
@@ -251,36 +322,44 @@ export function KioskPage() {
     return () => clearTimeout(t);
   }, [state]);
 
-  // URL 上的 branchId 不在分校清單裡 → 直接擋下，列出可用 ID 給人挑
+  // Tab 初始化：花名冊有資料時設第一個 sessionKey（跨場次重選時也重設）
+  useEffect(() => {
+    if (rosterStudents.length === 0) return;
+    setActiveRosterTab((prev) => {
+      const keys = [...new Set(rosterStudents.map((r) => r.sessionKey))];
+      if (prev && keys.includes(prev)) return prev;
+      return keys[0] ?? null;
+    });
+  }, [rosterStudents]);
+
+  // 辨識命中後自動切到該學生所屬 Tab
+  useEffect(() => {
+    if (!match) return;
+    const sessions = rosterStudents
+      .filter((r) => r.studentId === match.studentId)
+      .map((r) => r.sessionKey);
+    if (sessions.length === 0) return;
+    setActiveRosterTab((prev) => (prev && sessions.includes(prev) ? prev : sessions[0]));
+  }, [match, rosterStudents]);
+
   if (branchUnknown) {
-    return (
-      <UnknownBranch
-        branchId={branchId ?? ''}
-        branches={branches}
-      />
-    );
+    return <UnknownBranch branchId={branchId ?? ''} branches={branches} />;
   }
 
   return (
     <div style={styles.shell}>
-      {/* 上方狀態列 */}
       <header style={styles.topbar}>
         <div>
           <span style={styles.brand}>SAMS Kiosk</span>
           <span style={styles.branchName}>
             {branchName}
-            {branchId && (
-              <code style={styles.branchIdInline}>{branchId}</code>
-            )}
+            {branchId && <code style={styles.branchIdInline}>{branchId}</code>}
           </span>
         </div>
         <div style={styles.clock}>{formatTimeWithSec(now)}</div>
-        <Link to={ROUTES.branches} style={styles.exitBtn}>
-          結束
-        </Link>
+        <Link to={ROUTES.branches} style={styles.exitBtn}>結束</Link>
       </header>
 
-      {/* 主畫面：依 state 渲染 */}
       <main style={styles.main}>
         {state === 'IDLE' ? (
           <div style={styles.center}>
@@ -301,6 +380,7 @@ export function KioskPage() {
             webcam={webcam}
             selectedCount={selectedSessions.size}
             modelLoading={checkin.modelLoading}
+            modelLoaded={checkin.modelLoaded}
             modelError={checkin.modelError}
             onConfirmMatch={checkin.confirmMatch}
             onRejectMatch={checkin.rejectMatch}
@@ -308,36 +388,41 @@ export function KioskPage() {
             onManualCheckin={manualCheckin}
             onCancelManual={cancelManual}
             manualCandidates={manualCandidates}
+            rosterStudents={rosterStudents}
+            activeRosterTab={activeRosterTab}
+            onRosterTabChange={setActiveRosterTab}
+            manualMode={manualMode}
+            onToggleMode={() => setManualMode((v) => !v)}
+            onTriggerScan={checkin.triggerScan}
           />
         )}
       </main>
 
-      {/* 狀態列：上次掃描時間 + 比對範圍 */}
       <footer style={styles.statusBar}>
-        <span style={styles.statusItem}>
-          場次：{selectedSessions.size}
-        </span>
+        <span style={styles.statusItem}>場次：{selectedSessions.size}</span>
         <span style={styles.statusItem}>
           {checkin.modelLoading ? '模型載入中…' : checkin.modelLoaded ? '模型 ✓' : '模型未載入'}
         </span>
         <span style={styles.statusItem}>
           上次掃描：{checkin.lastScanAt ? formatTimeWithSec(checkin.lastScanAt) : '—'}
         </span>
+        <span style={styles.statusItem}>學生：{rosterStudents.length}</span>
       </footer>
     </div>
   );
 }
 
+// ─── Types ────────────────────────────────────────────────
 interface ManualCandidate {
   type: 'class' | 'course';
   studentId: string;
   studentName: string;
-  targetId: string;        // class: sessionId, course: courseSessionId
+  targetId: string;
   sessionLabel: string;
   status: string;
 }
 
-// URL 的 branchId 不存在於 branches 集合 → 顯示錯誤頁，列出可用 ID
+// ─── UnknownBranch ────────────────────────────────────────
 function UnknownBranch({
   branchId, branches,
 }: {
@@ -364,7 +449,6 @@ function UnknownBranch({
             <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginTop: '0.85rem', textAlign: 'center' }}>
               請確認 URL 上的分校代碼是否正確（大小寫、拼法）。
             </p>
-
             {branches.length > 0 ? (
               <>
                 <p style={{ color: '#cbd5e1', fontSize: '0.9rem', marginTop: '1.25rem', marginBottom: '0.5rem' }}>
@@ -378,9 +462,7 @@ function UnknownBranch({
                     }}>
                       <span>
                         <span style={{ fontSize: '1rem' }}>{b.name}</span>
-                        <code style={{
-                          marginLeft: '0.5rem', color: '#94a3b8', fontSize: '0.85rem',
-                        }}>{b.branchId}</code>
+                        <code style={{ marginLeft: '0.5rem', color: '#94a3b8', fontSize: '0.85rem' }}>{b.branchId}</code>
                       </span>
                       <Link
                         to={ROUTES.kiosk(b.branchId)}
@@ -407,10 +489,17 @@ function UnknownBranch({
   );
 }
 
+// ─── Stage ────────────────────────────────────────────────
+// READY / SCANNING / CONFIRMING：左側 camera、右側花名冊
+// SUCCESS / FAILED：全螢幕 overlay（3–4 秒後自動回 READY）
+// MANUAL：全螢幕手動報到
 function Stage({
-  state, match, now, webcam, selectedCount, modelLoading, modelError,
+  state, match, now, webcam, selectedCount,
+  modelLoading, modelLoaded, modelError,
   onConfirmMatch, onRejectMatch,
   onSwitchToManual, onManualCheckin, onCancelManual, manualCandidates,
+  rosterStudents, activeRosterTab, onRosterTabChange,
+  manualMode, onToggleMode, onTriggerScan,
 }: {
   state: KioskState;
   match: KioskMatch | null;
@@ -418,6 +507,7 @@ function Stage({
   webcam: ReturnType<typeof useWebcam>;
   selectedCount: number;
   modelLoading: boolean;
+  modelLoaded: boolean;
   modelError: string | null;
   onConfirmMatch: (m: KioskMatch) => Promise<void>;
   onRejectMatch: () => void;
@@ -425,63 +515,95 @@ function Stage({
   onManualCheckin: (c: ManualCandidate) => Promise<void>;
   onCancelManual: () => void;
   manualCandidates: ManualCandidate[];
+  rosterStudents: RosterStudent[];
+  activeRosterTab: string | null;
+  onRosterTabChange: (key: string) => void;
+  manualMode: boolean;
+  onToggleMode: () => void;
+  onTriggerScan: () => void;
 }) {
   switch (state) {
     case 'IDLE':
-      // 由上層改用 KioskSessionSelector 渲染；此 case 不會被走到
       return null;
 
     case 'READY':
       return (
-        <div style={styles.center}>
-          <CameraView webcam={webcam} />
-          {modelError ? (
-            <h1 style={{ ...styles.bigTitle, color: '#fca5a5' }}>模型載入失敗：{modelError}</h1>
-          ) : modelLoading ? (
-            <>
-              <h1 style={styles.bigTitle}>載入辨識模型中…</h1>
-              <p style={styles.subText}>第一次大約 6 MB，瀏覽器會自動 cache</p>
-            </>
-          ) : (
-            <>
-              <h1 style={styles.bigTitle}>Ready to Check-in</h1>
-              <p style={styles.subText}>看著鏡頭，保持微笑</p>
-              <p style={styles.devNote}>比對範圍：{selectedCount} 個場次</p>
-            </>
-          )}
+        <div style={styles.splitLayout}>
+          <div style={styles.leftPanel}>
+            <ModeToggle manualMode={manualMode} onToggle={onToggleMode} />
+            <CameraView webcam={webcam} />
+            {modelError ? (
+              <p style={{ ...styles.stateLabel, color: '#fca5a5' }}>模型載入失敗：{modelError}</p>
+            ) : modelLoading ? (
+              <p style={styles.stateLabel}>載入辨識模型中…</p>
+            ) : manualMode ? (
+              <button
+                type="button"
+                style={styles.scanBtn}
+                onClick={onTriggerScan}
+                disabled={!modelLoaded}
+              >
+                ▶ 辨識
+              </button>
+            ) : (
+              <>
+                <p style={styles.stateLabel}>請看鏡頭，保持微笑</p>
+                <p style={styles.devNote}>比對範圍：{selectedCount} 個場次</p>
+              </>
+            )}
+          </div>
+          <div style={styles.rightPanel}>
+            <StudentRoster students={rosterStudents} activeTab={activeRosterTab} onTabChange={onRosterTabChange} />
+          </div>
         </div>
       );
 
     case 'SCANNING':
       return (
-        <div style={styles.center}>
-          <CameraView webcam={webcam} scanning />
-          <h1 style={styles.bigTitle}>辨識中…</h1>
-          <p style={styles.subText}>請保持不動</p>
-          <KioskKeyframes />
+        <div style={styles.splitLayout}>
+          <div style={styles.leftPanel}>
+            <ModeToggle manualMode={manualMode} onToggle={onToggleMode} />
+            <CameraView webcam={webcam} scanning />
+            {manualMode ? (
+              <button type="button" style={{ ...styles.scanBtn, background: '#1d4ed8', cursor: 'not-allowed' }} disabled>
+                辨識中…
+              </button>
+            ) : (
+              <p style={{ ...styles.stateLabel, color: '#60a5fa' }}>辨識中…請保持不動</p>
+            )}
+            <KioskKeyframes />
+          </div>
+          <div style={styles.rightPanel}>
+            <StudentRoster students={rosterStudents} activeTab={activeRosterTab} onTabChange={onRosterTabChange} />
+          </div>
         </div>
       );
 
     case 'CONFIRMING':
       return (
-        <div style={styles.center}>
-          <div style={styles.confirmCard}>
-            <div style={{ fontSize: '5rem' }}>🤔</div>
-            <h2 style={styles.confirmName}>可能是：{match?.studentName ?? '—'}</h2>
-            <p style={styles.confirmConf}>信心值 {(match?.confidence ?? 0).toFixed(2)}</p>
-            <div style={styles.confirmBtns}>
-              <button
-                type="button"
-                style={styles.btnPrimary}
-                onClick={() => match && onConfirmMatch(match)}
-                disabled={!match}
-              >
-                確認報到
-              </button>
-              <button type="button" style={styles.btnSecondary} onClick={onRejectMatch}>
-                不是此人
-              </button>
+        <div style={styles.splitLayout}>
+          <div style={styles.leftPanel}>
+            <div style={styles.confirmCard}>
+              <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>🤔</div>
+              <h2 style={styles.confirmName}>可能是：{match?.studentName ?? '—'}</h2>
+              <p style={styles.confirmConf}>信心值 {(match?.confidence ?? 0).toFixed(2)}</p>
+              <div style={styles.confirmBtns}>
+                <button
+                  type="button"
+                  style={styles.btnPrimary}
+                  onClick={() => match && onConfirmMatch(match)}
+                  disabled={!match}
+                >
+                  確認報到
+                </button>
+                <button type="button" style={styles.btnSecondary} onClick={onRejectMatch}>
+                  不是此人
+                </button>
+              </div>
             </div>
+          </div>
+          <div style={styles.rightPanel}>
+            <StudentRoster students={rosterStudents} activeTab={activeRosterTab} onTabChange={onRosterTabChange} />
           </div>
         </div>
       );
@@ -527,6 +649,188 @@ function Stage({
   }
 }
 
+// ─── ModeToggle ──────────────────────────────────────────
+function ModeToggle({ manualMode, onToggle }: { manualMode: boolean; onToggle: () => void }) {
+  return (
+    <div style={styles.modeToggleWrap}>
+      <button
+        type="button"
+        style={{ ...styles.modeBtn, ...(manualMode ? styles.modeBtnActive : null) }}
+        onClick={() => { if (!manualMode) onToggle(); }}
+      >
+        手動辨識
+      </button>
+      <button
+        type="button"
+        style={{ ...styles.modeBtn, ...(!manualMode ? styles.modeBtnActive : null) }}
+        onClick={() => { if (manualMode) onToggle(); }}
+      >
+        自動辨識
+      </button>
+    </div>
+  );
+}
+
+// ─── StudentRoster ────────────────────────────────────────
+// 多 session 時顯示 Tab 列；單 session 時直接顯示格子
+const ROWS_PER_COL = 10;
+
+function StudentRoster({
+  students,
+  activeTab,
+  onTabChange,
+}: {
+  students: RosterStudent[];
+  activeTab: string | null;
+  onTabChange: (key: string) => void;
+}) {
+  // 收集唯一 session（保留插入順序）
+  const sessions = useMemo(() => {
+    const seen = new Map<string, { label: string; subLabel: string }>();
+    for (const s of students) {
+      if (!seen.has(s.sessionKey))
+        seen.set(s.sessionKey, { label: s.sessionLabel, subLabel: s.sessionSubLabel });
+    }
+    return [...seen.entries()].map(([key, { label, subLabel }]) => ({ key, label, subLabel }));
+  }, [students]);
+
+  // 每個 Tab 的已到/應到統計
+  const tabStats = useMemo(() => {
+    const map = new Map<string, { total: number; checkedIn: number }>();
+    for (const s of students) {
+      const cur = map.get(s.sessionKey) ?? { total: 0, checkedIn: 0 };
+      cur.total++;
+      if (s.status === 'CHECKED_IN' || s.status === 'LATE') cur.checkedIn++;
+      map.set(s.sessionKey, cur);
+    }
+    return map;
+  }, [students]);
+
+  const currentTab = (activeTab && sessions.some(s => s.key === activeTab))
+    ? activeTab
+    : sessions[0]?.key ?? null;
+  const visible = currentTab ? students.filter(s => s.sessionKey === currentTab) : students;
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {sessions.length > 0 && (
+        <div style={styles.tabBar}>
+          {sessions.map(({ key, label, subLabel }) => {
+            const stats = tabStats.get(key);
+            const isActive = key === currentTab;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onTabChange(key)}
+                style={{
+                  ...styles.tab,
+                  ...(isActive ? styles.tabActive : null),
+                }}
+              >
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{label}</div>
+                {subLabel && (
+                  <div style={{ fontSize: '0.78rem', color: isActive ? '#bfdbfe' : '#64748b', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subLabel}</div>
+                )}
+                {stats && (
+                  <div style={styles.tabStats}>
+                    {stats.checkedIn}/{stats.total} 已到
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <RosterGrid students={visible} />
+    </div>
+  );
+}
+
+// ─── RosterGrid ───────────────────────────────────────────
+// 純格子渲染：每欄 10 人，字體隨欄數縮小，無捲軸
+function RosterGrid({ students }: { students: RosterStudent[] }) {
+  if (students.length === 0) {
+    return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', fontSize: '1rem' }}>
+        尚無學生資料
+      </div>
+    );
+  }
+
+  const cols: RosterStudent[][] = [];
+  for (let i = 0; i < students.length; i += ROWS_PER_COL) {
+    cols.push(students.slice(i, i + ROWS_PER_COL));
+  }
+
+  const n = cols.length;
+  const nameFz = n <= 2 ? '1rem' : n <= 3 ? '0.9rem' : n <= 5 ? '0.8rem' : n <= 7 ? '0.7rem' : '0.62rem';
+  const idFz = n <= 2 ? '0.78rem' : n <= 4 ? '0.7rem' : '0.6rem';
+
+  return (
+    <div style={{
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'row',
+      gap: '0.3rem',
+      padding: '0.5rem 0.6rem',
+      overflow: 'hidden',
+      alignItems: 'stretch',
+    }}>
+      {cols.map((col, ci) => (
+        <div key={ci} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: 0 }}>
+          {col.map((s) => (
+            <div
+              key={s.key}
+              style={{
+                flex: 1,
+                background: statusBg(s.status),
+                borderRadius: 5,
+                padding: '0.25rem 0.45rem',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                transition: 'background 0.4s',
+                minHeight: 0,
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{
+                fontSize: nameFz, fontWeight: 600, color: '#f1f5f9',
+                lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {s.studentName}
+              </div>
+              <div style={{
+                fontSize: idFz, color: '#94a3b8', marginTop: '0.06rem',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {s.studentId}
+              </div>
+            </div>
+          ))}
+          {col.length < ROWS_PER_COL &&
+            Array.from({ length: ROWS_PER_COL - col.length }).map((_, i) => (
+              <div key={`pad-${i}`} style={{ flex: 1 }} />
+            ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function statusBg(status: string): string {
+  switch (status) {
+    case 'CHECKED_IN': return '#14532d';  // 深綠
+    case 'LATE':       return '#78350f';  // 深琥珀
+    case 'LEAVE':      return '#1e3a8a';  // 深藍
+    case 'ABSENT':     return '#450a0a';  // 深紅
+    case 'MAKEUP':     return '#312e81';  // 深紫
+    default:           return '#1e293b';  // 深藍灰（SCHEDULED）
+  }
+}
+
+// ─── ManualFallback ───────────────────────────────────────
 function ManualFallback({
   candidates, onCheckin, onCancel,
 }: {
@@ -551,12 +855,11 @@ function ManualFallback({
 
   return (
     <div style={styles.center}>
-      <div style={{ ...styles.confirmCard, width: 'min(640px, 90vw)' }}>
-        <h2 style={{ margin: 0, fontSize: '1.5rem', textAlign: 'left' }}>講師手動報到</h2>
-        <p style={{ color: '#cbd5e1', fontSize: '0.9rem', textAlign: 'left', marginTop: '0.4rem' }}>
+      <div style={{ ...styles.confirmCard, width: 'min(640px, 90vw)', textAlign: 'left' }}>
+        <h2 style={{ margin: 0, fontSize: '1.5rem' }}>講師手動報到</h2>
+        <p style={{ color: '#cbd5e1', fontSize: '0.9rem', marginTop: '0.4rem' }}>
           搜尋目前比對範圍內、尚未報到的學生
         </p>
-
         <input
           type="search"
           placeholder="搜尋姓名 / 學號"
@@ -566,14 +869,10 @@ function ManualFallback({
           style={{
             width: '100%', padding: '0.7rem 0.9rem', fontSize: '1rem',
             border: '1px solid #475569', borderRadius: 6, background: '#0f172a',
-            color: '#f1f5f9', marginTop: '0.75rem', outline: 'none',
+            color: '#f1f5f9', marginTop: '0.75rem', outline: 'none', boxSizing: 'border-box',
           }}
         />
-
-        <ul style={{
-          listStyle: 'none', padding: 0, margin: '0.75rem 0 0',
-          maxHeight: 320, overflow: 'auto', textAlign: 'left',
-        }}>
+        <ul style={{ listStyle: 'none', padding: 0, margin: '0.75rem 0 0', maxHeight: 320, overflow: 'auto' }}>
           {filtered.length === 0 && (
             <li style={{ padding: '1rem', color: '#94a3b8', textAlign: 'center' }}>
               {candidates.length === 0 ? '比對範圍內所有學生都已報到 / 請假' : '沒有符合的學生'}
@@ -582,13 +881,10 @@ function ManualFallback({
           {filtered.map((c) => {
             const key = `${c.type}:${c.targetId}__${c.studentId}`;
             return (
-              <li
-                key={key}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '0.6rem 0.8rem', borderBottom: '1px solid #334155',
-                }}
-              >
+              <li key={key} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '0.6rem 0.8rem', borderBottom: '1px solid #334155',
+              }}>
                 <div>
                   <div style={{ fontSize: '1rem' }}>{c.studentName}</div>
                   <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.15rem' }}>
@@ -610,7 +906,6 @@ function ManualFallback({
             );
           })}
         </ul>
-
         <button
           type="button"
           onClick={onCancel}
@@ -627,6 +922,7 @@ function ManualFallback({
   );
 }
 
+// ─── CameraView ───────────────────────────────────────────
 function CameraView({
   webcam, scanning = false,
 }: {
@@ -642,7 +938,6 @@ function CameraView({
         playsInline
         style={{
           ...styles.video,
-          // 鏡像（自助使用更直覺）
           transform: 'scaleX(-1)',
           ...(scanning ? { boxShadow: '0 0 0 4px #2563eb, 0 0 24px #2563eb' } : null),
         }}
@@ -664,6 +959,7 @@ function CameraView({
   );
 }
 
+// ─── Helpers ──────────────────────────────────────────────
 function greeting(d: Date): string {
   const h = d.getHours();
   if (h < 12) return '早安';
@@ -672,7 +968,6 @@ function greeting(d: Date): string {
 }
 
 function KioskKeyframes() {
-  // 把 keyframes 注入文件 head（避免每次重 render 重新注入）
   return (
     <style>{`@keyframes sams-pulse {
       0%, 100% { transform: scale(1); opacity: 1; }
@@ -681,6 +976,7 @@ function KioskKeyframes() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────
 const styles: Record<string, React.CSSProperties> = {
   shell: {
     minHeight: '100vh',
@@ -696,6 +992,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0.6rem 1.25rem',
     background: '#020617',
     borderBottom: '1px solid #1e293b',
+    flexShrink: 0,
   },
   brand: { fontWeight: 700, fontSize: '1rem', letterSpacing: 1 },
   branchName: { marginLeft: '0.75rem', color: '#94a3b8', fontSize: '0.95rem' },
@@ -714,7 +1011,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '0.85rem',
     textDecoration: 'none',
   },
-  main: { flex: 1, display: 'flex', alignItems: 'stretch', justifyContent: 'stretch' },
+  main: { flex: 1, display: 'flex', overflow: 'hidden' },
+
+  // IDLE centred wrapper
   center: {
     flex: 1,
     display: 'flex',
@@ -724,15 +1023,120 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '2rem',
     transition: 'background 0.4s',
   },
-  cameraPlaceholder: { fontSize: '8rem', opacity: 0.7, marginBottom: '1.5rem' },
+
+  // ── split layout (READY / SCANNING / CONFIRMING) ──────
+  splitLayout: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  leftPanel: {
+    width: '38%',
+    flexShrink: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.85rem',
+    padding: '1.25rem',
+    borderRight: '1px solid #1e293b',
+  },
+  rightPanel: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    background: '#080f1c',
+    overflow: 'hidden',
+  },
+  stateLabel: {
+    margin: 0,
+    fontSize: '1.1rem',
+    color: '#cbd5e1',
+    textAlign: 'center',
+  },
+
+  // Session Tabs
+  tabBar: {
+    display: 'flex',
+    flexShrink: 0,
+    borderBottom: '2px solid #1e293b',
+  },
+  tab: {
+    flex: 1,
+    padding: '0.5rem 0.5rem',
+    background: '#0f172a',
+    color: '#94a3b8',
+    border: 'none',
+    borderRight: '1px solid #1e293b',
+    fontSize: '0.82rem',
+    cursor: 'pointer',
+    textAlign: 'center' as const,
+    lineHeight: 1.3,
+    minWidth: 0,
+    minHeight: 68,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabActive: {
+    background: '#1d4ed8',
+    color: '#fff',
+    fontWeight: 700,
+  },
+  tabStats: {
+    fontSize: '0.7rem',
+    marginTop: '0.15rem',
+    opacity: 0.85,
+    fontWeight: 400,
+  },
+
+  // 辨識模式切換
+  modeToggleWrap: {
+    display: 'flex',
+    width: '100%',
+    border: '1px solid #334155',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  modeBtn: {
+    flex: 1,
+    padding: '0.45rem 0',
+    background: '#1e293b',
+    color: '#94a3b8',
+    border: 'none',
+    fontSize: '0.88rem',
+    cursor: 'pointer',
+  },
+  modeBtnActive: {
+    background: '#2563eb',
+    color: '#fff',
+    fontWeight: 600,
+  },
+
+  // 手動辨識觸發按鈕
+  scanBtn: {
+    width: '100%',
+    padding: '0.9rem',
+    background: '#2563eb',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 8,
+    fontSize: '1.2rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+    letterSpacing: '0.5px',
+  },
+
+  // Camera
   cameraFrame: {
     position: 'relative',
-    width: 'min(640px, 70vw)',
+    width: '100%',
     aspectRatio: '4 / 3',
     background: '#000',
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
-    marginBottom: '1.5rem',
     boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
   },
   video: { width: '100%', height: '100%', objectFit: 'cover', transition: 'box-shadow 0.3s' },
@@ -742,30 +1146,30 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(15,23,42,0.85)', color: '#f1f5f9',
     fontSize: '1.05rem', textAlign: 'center', padding: '1rem',
   },
-  bigTitle: { margin: 0, fontSize: '3rem', fontWeight: 700 },
-  subText: { marginTop: '0.75rem', color: '#cbd5e1', fontSize: '1.25rem' },
 
+  // Confirm card (in left panel)
   confirmCard: {
     background: '#1e293b',
-    padding: '2.5rem 3rem',
+    padding: '2rem',
     borderRadius: 16,
     textAlign: 'center',
     boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
-    minWidth: 360,
+    width: '100%',
   },
-  confirmName: { margin: '0.75rem 0 0.4rem', fontSize: '2rem' },
-  confirmConf: { color: '#94a3b8', fontSize: '1rem', margin: 0 },
-  confirmBtns: { display: 'flex', gap: '0.75rem', marginTop: '1.5rem', justifyContent: 'center' },
+  confirmName: { margin: '0.5rem 0 0.3rem', fontSize: '1.8rem' },
+  confirmConf: { color: '#94a3b8', fontSize: '0.95rem', margin: 0 },
+  confirmBtns: { display: 'flex', gap: '0.75rem', marginTop: '1.25rem', justifyContent: 'center' },
   btnPrimary: {
-    padding: '0.85rem 1.5rem', background: '#16a34a', color: '#fff',
+    padding: '0.75rem 1.25rem', background: '#16a34a', color: '#fff',
     border: 'none', borderRadius: 8, fontSize: '1rem', fontWeight: 600,
   },
   btnSecondary: {
-    padding: '0.85rem 1.5rem', background: '#475569', color: '#fff',
+    padding: '0.75rem 1.25rem', background: '#475569', color: '#fff',
     border: 'none', borderRadius: 8, fontSize: '1rem',
   },
-  devNote: { color: '#64748b', fontSize: '0.8rem', marginTop: '0.75rem' },
+  devNote: { color: '#64748b', fontSize: '0.8rem', margin: 0 },
 
+  // Success / Fail (full-screen overlays)
   successIcon: {
     fontSize: '8rem',
     width: 160, height: 160, lineHeight: '160px',
@@ -791,10 +1195,11 @@ const styles: Record<string, React.CSSProperties> = {
   failTitle: { margin: 0, fontSize: '2.5rem', color: '#fff' },
   failMsg: { color: '#fee2e2', fontSize: '1.25rem', marginTop: '0.4rem' },
 
+  // Footer
   statusBar: {
     display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap',
     padding: '0.5rem 1.25rem', background: '#020617', borderTop: '1px solid #1e293b',
-    color: '#94a3b8', fontSize: '0.8rem',
+    color: '#94a3b8', fontSize: '0.8rem', flexShrink: 0,
   },
   statusItem: { fontVariantNumeric: 'tabular-nums' },
 };
