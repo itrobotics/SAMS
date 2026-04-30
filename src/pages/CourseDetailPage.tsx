@@ -1,4 +1,4 @@
-// 學程詳情頁
+// 課程方案詳情頁
 //
 // 三個區塊：
 //   1) 基本資訊（含進度條：實際/計畫時數）
@@ -186,41 +186,13 @@ export function CourseDetailPage() {
     return Math.round(sum * 100) / 100;
   }, [modules]);
 
-  // 排課清單：展平所有 active module 的 slots，按日期+時間排序
-  const scheduleRows: ScheduleRow[] = useMemo(() => {
-    const rows: ScheduleRow[] = [];
-    for (const m of modules) {
-      if (!m.active) continue;
-      m.slots.forEach((slot, idx) => {
-        rows.push({
-          date: slot.date,
-          startTime: slot.startTime,
-          endTime: slot.endTime,
-          hours: slot.hours,
-          moduleId: m.moduleId,
-          moduleName: m.name,
-          instructorId: m.instructorId,
-          classroom: m.classroom,
-          slotSeq: `${m.moduleId}-${idx + 1}`,
-          session: sessionsBySlot.get(slotKey(m.moduleId, slot)),
-        });
-      });
-    }
-    rows.sort((a, b) => {
-      const d = a.date.localeCompare(b.date);
-      if (d !== 0) return d;
-      return a.startTime.localeCompare(b.startTime);
-    });
-    return rows;
-  }, [modules, sessionsBySlot]);
-
   if (course === null) return <div style={{ color: '#6b7280' }}>載入中…</div>;
   if (course === 'missing') {
     return (
       <section>
-        <h1>找不到學程</h1>
+        <h1>找不到課程方案</h1>
         <p>課程代碼 <code>{courseId}</code> 不存在。</p>
-        <Link to={ROUTES.courses}>← 回學程列表</Link>
+        <Link to={ROUTES.courses}>← 回課程方案列表</Link>
       </section>
     );
   }
@@ -228,8 +200,8 @@ export function CourseDetailPage() {
     return (
       <section>
         <h1>無權限</h1>
-        <p>此學程屬於其他分校。</p>
-        <Link to={ROUTES.courses}>← 回學程列表</Link>
+        <p>此課程方案屬於其他分校。</p>
+        <Link to={ROUTES.courses}>← 回課程方案列表</Link>
       </section>
     );
   }
@@ -259,7 +231,7 @@ export function CourseDetailPage() {
 
   async function handleRemoveStudent(studentId: string) {
     if (!courseId) return;
-    if (!window.confirm('確定要將此學員從學程移除？')) return;
+    if (!window.confirm('確定要將此學員從課程方案移除？')) return;
     setBusyId(studentId);
     try {
       await removeStudentFromCourse(courseId, studentId);
@@ -321,7 +293,7 @@ export function CourseDetailPage() {
 
   async function handleDeleteCourse() {
     if (!course || course === 'missing' || !courseId) return;
-    if (!window.confirm(`確定要永久刪除學程「${course.name}」？\n所有單元、場次、學員、出席紀錄都會一併刪除，無法復原。`)) return;
+    if (!window.confirm(`確定要永久刪除課程方案「${course.name}」？\n所有單元、場次、學員、出席紀錄都會一併刪除，無法復原。`)) return;
     setBusyId('__course__');
     try {
       await deleteCourseDeep(courseId);
@@ -343,7 +315,7 @@ export function CourseDetailPage() {
     <section>
       <header style={styles.header}>
         <div>
-          <Link to={ROUTES.courses} style={styles.back}>← 回學程列表</Link>
+          <Link to={ROUTES.courses} style={styles.back}>← 回課程方案列表</Link>
           <h1 style={styles.title}>{course.name}</h1>
           <p style={styles.subtitle}>
             <code>{course.courseId}</code> · {branchName}
@@ -384,7 +356,7 @@ export function CourseDetailPage() {
             onClick={handleDeleteCourse}
             disabled={busyId === '__course__'}
           >
-            {busyId === '__course__' ? '刪除中…' : '刪除整個學程'}
+            {busyId === '__course__' ? '刪除中…' : '刪除整個課程方案'}
           </button>
         )}
       </header>
@@ -529,12 +501,6 @@ export function CourseDetailPage() {
           );
         })}
       </article>
-
-      {/* === 排課清單 === */}
-      <CourseScheduleCard
-        rows={scheduleRows}
-        instructorMap={instructorMap}
-      />
 
       {/* === 學員名單（左右兩欄）=== */}
       <div style={styles.grid}>
@@ -683,188 +649,6 @@ export function CourseDetailPage() {
   );
 }
 
-// ─── 排課清單用型別 ───────────────────────────────────────
-interface ScheduleRow {
-  date: string;
-  startTime: string;
-  endTime: string;
-  hours: number;
-  moduleId: string;
-  moduleName: string;
-  instructorId: string;
-  classroom: string;
-  slotSeq: string;
-  session?: CourseSessionDoc;
-}
-
-type ScheduleView = 'day' | 'module' | 'instructor';
-
-function weekdayZh(dateStr: string): string {
-  const days = ['日', '一', '二', '三', '四', '五', '六'];
-  try {
-    const d = new Date(dateStr + 'T00:00:00');
-    return `（${days[d.getDay()]}）`;
-  } catch { return ''; }
-}
-
-// ─── 排課清單 Card ────────────────────────────────────────
-function CourseScheduleCard({
-  rows,
-  instructorMap,
-}: {
-  rows: ScheduleRow[];
-  instructorMap: Map<string, string>;
-}) {
-  const [view, setView] = useState<ScheduleView>('day');
-
-  function iLabel(id: string): string {
-    if (!id) return '—';
-    const name = instructorMap.get(id);
-    return name ? `${id} ${name}` : id;
-  }
-
-  const totalHours = useMemo(() => Math.round(rows.reduce((s, r) => s + r.hours, 0) * 100) / 100, [rows]);
-  const uniqueDates = useMemo(() => new Set(rows.map((r) => r.date)).size, [rows]);
-
-  type ScheduleGroup = { key: string; label: string; rows: ScheduleRow[] };
-  const groups: ScheduleGroup[] = useMemo(() => {
-    const ordered = new Map<string, { label: string; rows: ScheduleRow[] }>();
-    for (const r of rows) {
-      let k: string;
-      let label: string;
-      if (view === 'day') {
-        k = r.date;
-        label = `${r.date}${weekdayZh(r.date)}`;
-      } else if (view === 'module') {
-        k = r.moduleId;
-        label = `${r.moduleId}　${r.moduleName}`;
-      } else {
-        k = r.instructorId || '__none__';
-        label = r.instructorId ? iLabel(r.instructorId) : '（未指定講師）';
-      }
-      if (!ordered.has(k)) ordered.set(k, { label, rows: [] });
-      ordered.get(k)!.rows.push(r);
-    }
-    return Array.from(ordered.entries()).map(([key, v]) => ({ key, ...v }));
-  }, [rows, view, instructorMap]);
-
-  const tabs: Array<{ id: ScheduleView; label: string }> = [
-    { id: 'day', label: '按日期' },
-    { id: 'module', label: '按單元' },
-    { id: 'instructor', label: '按講師' },
-  ];
-
-  if (rows.length === 0) {
-    return (
-      <article style={styles.card}>
-        <h2 style={styles.h2}>排課清單</h2>
-        <p style={styles.placeholder}>所有單元都尚未排定時段，請先在「課程單元」中新增時段。</p>
-      </article>
-    );
-  }
-
-  return (
-    <article style={styles.card}>
-      <header style={styles.cardHeader}>
-        <h2 style={styles.h2}>
-          排課清單
-          <span style={styles.h2Sub}>
-            · {uniqueDates} 天 · {rows.length} 個時段 · {totalHours} 小時
-          </span>
-        </h2>
-        <div style={{ display: 'flex', gap: '0.25rem' }}>
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              style={{
-                padding: '0.3rem 0.75rem',
-                border: '1px solid',
-                borderRadius: 6,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                background: view === t.id ? '#2563eb' : '#fff',
-                color: view === t.id ? '#fff' : '#374151',
-                borderColor: view === t.id ? '#2563eb' : '#d1d5db',
-                fontWeight: view === t.id ? 600 : 400,
-              }}
-              onClick={() => setView(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      {groups.map((g) => {
-        const gHours = Math.round(g.rows.reduce((s, r) => s + r.hours, 0) * 100) / 100;
-        return (
-          <div key={g.key} style={styles.scheduleGroup}>
-            <div style={styles.scheduleGroupHeader}>
-              <span style={styles.scheduleGroupLabel}>{g.label}</span>
-              <span style={styles.scheduleGroupMeta}>{g.rows.length} 節 · {gHours} h</span>
-            </div>
-            <table style={{ ...styles.slotTable, borderRadius: '0 0 6px 6px', overflow: 'hidden' }}>
-              <thead>
-                <tr>
-                  {view === 'day'
-                    ? <th style={styles.slotTh}>序號</th>
-                    : <th style={styles.slotTh}>日期</th>
-                  }
-                  <th style={styles.slotTh}>時間</th>
-                  <th style={styles.slotThNum}>時數</th>
-                  {view !== 'module' && <th style={styles.slotTh}>單元</th>}
-                  {view !== 'instructor' && <th style={styles.slotTh}>講師</th>}
-                  <th style={styles.slotTh}>教室</th>
-                  <th style={styles.slotTh}>狀態</th>
-                </tr>
-              </thead>
-              <tbody>
-                {g.rows.map((r) => (
-                  <tr key={`${r.slotSeq}|${r.date}|${r.startTime}`}>
-                    {view === 'day' ? (
-                      <td style={styles.slotTd}>
-                        <code style={{ fontSize: '0.82rem', color: '#6b7280' }}>{r.slotSeq}</code>
-                      </td>
-                    ) : (
-                      <td style={styles.slotTd}>
-                        {r.date}
-                        <span style={{ color: '#9ca3af', fontSize: '0.8rem', marginLeft: '0.2rem' }}>
-                          {weekdayZh(r.date)}
-                        </span>
-                      </td>
-                    )}
-                    <td style={styles.slotTd}>{r.startTime}–{r.endTime}</td>
-                    <td style={styles.slotTdNum}>{r.hours}</td>
-                    {view !== 'module' && (
-                      <td style={styles.slotTd}>
-                        {r.moduleName}
-                        <code style={{ marginLeft: '0.3rem', color: '#9ca3af', fontSize: '0.78rem' }}>
-                          {r.moduleId}
-                        </code>
-                      </td>
-                    )}
-                    {view !== 'instructor' && (
-                      <td style={styles.slotTd}>{iLabel(r.instructorId)}</td>
-                    )}
-                    <td style={styles.slotTd}>{r.classroom || '—'}</td>
-                    <td style={styles.slotTd}>
-                      {r.session
-                        ? <CourseSessionStatusPill status={r.session.status} />
-                        : <span style={styles.pillNotOpened}>尚未開啟</span>
-                      }
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        );
-      })}
-    </article>
-  );
-}
-
 function CourseSessionStatusPill({ status }: { status: CourseSessionDoc['status'] }) {
   const map = {
     scheduled: { bg: '#dbeafe', fg: '#1e40af' },
@@ -954,17 +738,6 @@ const styles: Record<string, React.CSSProperties> = {
   pillActive: { padding: '0.1rem 0.5rem', borderRadius: 12, fontSize: '0.8rem', background: '#dcfce7', color: '#166534' },
   pillInactive: { padding: '0.1rem 0.5rem', borderRadius: 12, fontSize: '0.8rem', background: '#f3f4f6', color: '#6b7280' },
   pillNotOpened: { padding: '0.1rem 0.5rem', borderRadius: 12, fontSize: '0.8rem', background: '#f9fafb', color: '#9ca3af', border: '1px dashed #d1d5db' },
-
-  // === 排課清單 ===
-  scheduleGroup: { marginBottom: '0.75rem' },
-  scheduleGroupHeader: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '0.4rem 0.75rem',
-    background: '#f1f5f9', borderRadius: '6px 6px 0 0',
-    border: '1px solid #e2e8f0', borderBottom: 'none',
-  },
-  scheduleGroupLabel: { fontWeight: 600, fontSize: '0.92rem', color: '#1f2937' },
-  scheduleGroupMeta: { color: '#9ca3af', fontSize: '0.82rem' },
 
   // === module 區塊與 slot 表格 ===
   moduleBlock: {

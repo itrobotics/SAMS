@@ -59,7 +59,6 @@ export function decideVerdict(
 
 interface UseKioskCheckinArgs {
   enabled: boolean;                           // 攝影機 ready + state in READY
-  manualMode: boolean;                        // true=手動按鈕觸發；false=自動每秒掃描
   webcam: ReturnType<typeof useWebcam>;
   branchId: string;
   selectedSessions: Set<string>;              // 'class:xxx' / 'course:xxx'
@@ -81,10 +80,10 @@ interface KioskCheckinStatus {
   modelLoading: boolean;
   modelError: string | null;
   lastScanAt: Date | null;
-  matchProfiles: number;
+  matchProfiles: number; // 目前比對範圍的 active 照片數
+  // Task 039：CONFIRMING 狀態用的 callbacks
   confirmMatch: (m: KioskMatch) => Promise<void>;
   rejectMatch: () => void;
-  triggerScan: () => void;  // 手動模式：外部呼叫觸發一次掃描
 }
 
 export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
@@ -137,7 +136,7 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
       if (r.status === 'CHECKED_IN' || r.status === 'LATE' || r.status === 'MAKEUP') continue;
       needsCheckin.add(r.studentId);
     }
-    // 學程
+    // 課程方案
     for (const r of args.courseAttendanceForToday) {
       if (!args.selectedSessions.has(courseKey(r.courseSessionId))) continue;
       if (r.status === 'LEAVE') continue;
@@ -203,7 +202,7 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
         return;
       }
 
-      // 找該學生在 selectedSessions 裡的 attendance records（班級 + 學程）
+      // 找該學生在 selectedSessions 裡的 attendance records（班級 + 課程方案）
       const ownClassRecords = args.attendanceForToday.filter(
         (r) => r.studentId === best.profile.studentId
           && args.selectedSessions.has(classKey(r.sessionId)),
@@ -262,7 +261,7 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
         });
       }
       for (const rec of ownCourseRecords) {
-        // 學程沒有 graceMinutes 自動判定，一律 CHECKED_IN
+        // 課程方案沒有 graceMinutes 自動判定，一律 CHECKED_IN
         await updateCourseAttendance(courseAttendanceDocId(rec.courseSessionId, rec.studentId), {
           status: 'CHECKED_IN',
           operatorId: args.operatorId,
@@ -288,13 +287,13 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
     }
   }, [args, modelLoaded, computeTargetStudentIds]);
 
-  // 4) 排程：自動模式時 READY 每 SCAN_INTERVAL_MS 跑一次；手動模式不啟動
+  // 4) 排程：READY 時每 SCAN_INTERVAL_MS 跑一次；其他狀態暫停
   useEffect(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    if (!args.enabled || args.manualMode) return;
+    if (!args.enabled) return;
 
     function loop() {
       runOneScan().finally(() => {
@@ -306,14 +305,9 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = null;
     };
-  }, [args.enabled, args.manualMode, runOneScan]);
+  }, [args.enabled, runOneScan]);
 
-  // 手動觸發一次掃描（手動模式用）
-  const triggerScan = useCallback(() => {
-    void runOneScan();
-  }, [runOneScan]);
-
-  // Task 039：CONFIRMING → 確認報到（班級 + 學程）
+  // Task 039：CONFIRMING → 確認報到（班級 + 課程方案）
   const confirmMatch = useCallback(async (m: KioskMatch) => {
     const ownClassRecords = args.attendanceForToday.filter(
       (r) => r.studentId === m.studentId
@@ -384,9 +378,8 @@ export function useKioskCheckin(args: UseKioskCheckinArgs): KioskCheckinStatus {
     modelLoading,
     modelError,
     lastScanAt,
-    matchProfiles: 0,
+    matchProfiles: 0, // Task 041 會把整個 stats 補齊
     confirmMatch,
     rejectMatch,
-    triggerScan,
   };
 }

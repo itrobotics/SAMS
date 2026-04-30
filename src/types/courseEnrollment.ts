@@ -1,6 +1,6 @@
 // course_enrollments collection 型別定義
 //
-// 「學程 ↔ 學員」關聯。一個學員可同時報名多個 course；
+// 「課程方案 ↔ 學員」關聯。一個學員可同時報名多個 course；
 // 退訓 / 完成可改 status，不必直接刪除以保留歷史。
 //
 // Firestore 路徑：`course_enrollments/{enrollmentId}`

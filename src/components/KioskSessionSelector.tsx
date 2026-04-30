@@ -1,13 +1,13 @@
-// Kiosk session selector（Task 031 + 學程延伸）
+// Kiosk session selector（Task 031 + 課程方案延伸）
 //
 // Kiosk 啟動前要先選定「比對哪些場次的學生」。同一時段可能有多班同時上課，
 // 因此採多選；預設勾選「目前進行中或即將開始」的 sessions：
 //   - 進行中：start - openBefore <= now <= end + closeAfter
 //   - 即將開始：start - openBefore <= now < start
 //
-// 學程場次也納入清單，與班級場次並列。selection set 用前綴區分：
+// 課程方案場次也納入清單，與班級場次並列。selection set 用前綴區分：
 //   - `class:${sessionId}` 班級場次
-//   - `course:${courseSessionId}` 學程場次
+//   - `course:${courseSessionId}` 課程方案場次
 
 import { useEffect, useMemo, useState } from 'react';
 
@@ -113,7 +113,7 @@ export function KioskSessionSelector({
           </p>
           <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>
             班級：請至「設定 → 每日場次產生」建立。<br />
-            學程：請至「學程 → 單元」對某個 slot 點「開啟報到」。
+            課程方案：請至「課程方案 → 單元」對某個 slot 點「開啟報到」。
           </p>
           <p style={{ color: '#64748b', fontSize: '0.78rem', marginTop: '0.85rem' }}>
             若場次的日期 / 分校與上方條件不一致，將不會出現於此清單。
@@ -138,7 +138,7 @@ export function KioskSessionSelector({
           )}
 
           {courseSessions.length > 0 && (
-            <SessionGroup label="學程今日場次">
+            <SessionGroup label="課程方案今日場次">
               {courseSessions.map((s) => (
                 <CourseRow
                   key={s.courseSessionId}
@@ -255,6 +255,9 @@ function CourseRow({
           {session.startTime}–{session.endTime}
           {session.classroom ? ` · 教室 ${session.classroom}` : ''}
           {instructorLabel ? ` · 講師 ${instructorLabel}` : ''}
+          <span style={{ marginLeft: '0.4rem', color: '#64748b' }}>
+            <code>{session.courseSessionId}</code>
+          </span>
         </div>
       </div>
       {active && <span style={styles.activeBadge}>進行中</span>}

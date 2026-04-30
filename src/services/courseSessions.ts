@@ -83,7 +83,7 @@ export function subscribeCourseSessions(
   );
 }
 
-// 分校 dashboard 用：某分校 + 某日的所有學程場次
+// 分校 dashboard 用：某分校 + 某日的所有課程方案場次
 interface SubscribeCourseSessionsForBranchDateOptions {
   branchId: string;
   date: string;
@@ -109,7 +109,7 @@ export function subscribeCourseSessionsForBranchDate(
   );
 }
 
-// HQ dashboard 用：某日跨分校的所有學程場次
+// HQ dashboard 用：某日跨分校的所有課程方案場次
 export function subscribeAllCourseSessionsForDate(
   date: string,
   onChange: (list: CourseSessionDoc[]) => void,

@@ -1,13 +1,13 @@
-// 分校今日場次看板（Task 024 + 學程延伸）
+// 分校今日場次看板（Task 024 + 課程方案延伸）
 //
 // /branch-dashboard/:branchId
-// 顯示該分校「今日」所有班級場次與學程場次，附應到/已到/未到/請假/遲到統計。
+// 顯示該分校「今日」所有班級場次與課程方案場次，附應到/已到/未到/請假/遲到統計。
 //
 // 班級：sessions + attendance_records（class）
-// 學程：course_sessions + course_attendance（依 branchId+date 查；
+// 課程方案：course_sessions + course_attendance（依 branchId+date 查；
 //   course_attendance 需有 date 欄位，由 openCourseSessionFromSlot 寫入時帶入）
 //
-// 點擊班級場次進 /session/:sessionId；點學程場次進
+// 點擊班級場次進 /session/:sessionId；點課程方案場次進
 // /courses/:courseId/sessions/:courseSessionId。
 
 import { useMemo, useState } from 'react';
@@ -70,7 +70,7 @@ export function BranchDashboardPage() {
     return map;
   }, [records]);
 
-  // 學程場次的 stats（key 是 courseSessionId）
+  // 課程方案場次的 stats（key 是 courseSessionId）
   const statsByCourseSession = useMemo(() => {
     const map = new Map<string, SessionStats>();
     for (const r of courseAttendance) {
@@ -92,7 +92,7 @@ export function BranchDashboardPage() {
       acc.absent += s.absent;
       acc.scheduled += s.scheduled;
     }
-    // 把學程的 stats 也加進總數
+    // 把課程方案的 stats 也加進總數
     for (const s of statsByCourseSession.values()) {
       acc.total += s.total;
       acc.checkedIn += s.checkedIn;
@@ -221,7 +221,7 @@ export function BranchDashboardPage() {
       </div>
 
       <h2 style={styles.sectionTitle}>
-        學程今日場次（{courseSessions.length}）
+        課程方案今日場次（{courseSessions.length}）
       </h2>
       <div style={styles.tableWrap}>
         <table style={styles.table}>
@@ -244,7 +244,7 @@ export function BranchDashboardPage() {
             {courseSessions.length === 0 && (
               <tr>
                 <td colSpan={11} style={styles.empty}>
-                  此日期尚無學程場次。可至「學程 → 單元 → 開啟報到」建立。
+                  此日期尚無課程方案場次。可至「課程方案 → 單元 → 開啟報到」建立。
                 </td>
               </tr>
             )}

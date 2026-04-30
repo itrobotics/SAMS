@@ -34,8 +34,8 @@ import type { CourseAttendanceDoc, CourseAttendanceStatus } from '../types/cours
 interface BranchRow {
   branch: BranchDoc;
   classCount: number;          // 班級場次數
-  courseSessionCount: number;  // 學程場次數
-  total: number;       // 應到（班級+學程合計）
+  courseSessionCount: number;  // 課程方案場次數
+  total: number;       // 應到（班級+課程方案合計）
   checkedIn: number;   // CHECKED_IN
   late: number;        // LATE
   leave: number;       // LEAVE
@@ -154,7 +154,7 @@ export function HQDashboardPage() {
             <tr>
               <th style={styles.th}>分校</th>
               <th style={styles.thNum}>今日班級</th>
-              <th style={styles.thNum}>學程</th>
+              <th style={styles.thNum}>課程方案</th>
               <th style={styles.thNum}>應到</th>
               <th style={styles.thNum}>已到</th>
               <th style={styles.thNum}>遲到</th>
@@ -235,7 +235,7 @@ function buildRows(
     if (row) row.classCount += 1;
   }
 
-  // 學程場次數
+  // 課程方案場次數
   for (const s of courseSessions) {
     const row = map.get(s.branchId);
     if (row) row.courseSessionCount += 1;
@@ -249,7 +249,7 @@ function buildRows(
     bump(row, r.status);
   }
 
-  // 學程出席統計（合併進同一 row）
+  // 課程方案出席統計（合併進同一 row）
   for (const r of courseAttendance) {
     const row = map.get(r.branchId);
     if (!row) continue;

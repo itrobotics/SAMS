@@ -1,7 +1,7 @@
 // course_attendance collection 型別定義
 //
 // 與 attendance_records 並列：attendance_records 是班級場次的出席，
-// course_attendance 則是學程場次（course_sessions）的出席。
+// course_attendance 則是課程方案場次（course_sessions）的出席。
 //
 // Firestore 路徑：`course_attendance/{attendanceId}`
 // attendanceId 格式 `${courseSessionId}__${studentId}`，確保同一場次同一學員只會有一筆。
