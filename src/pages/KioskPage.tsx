@@ -200,7 +200,7 @@ export function KioskPage() {
         sessionSubLabel: subLabelMap.get(sk) ?? '',
       });
     }
-    list.sort((a, b) => a.studentName.localeCompare(b.studentName, 'zh-Hant'));
+    list.sort((a, b) => a.studentName.localeCompare(b.studentName, 'zh-Hant-u-co-stroke'));
     return list;
   }, [
     attendanceRT.data, courseAttendanceRT.data, selectedSessions,
@@ -673,7 +673,6 @@ function ModeToggle({ manualMode, onToggle }: { manualMode: boolean; onToggle: (
 
 // ─── StudentRoster ────────────────────────────────────────
 // 多 session 時顯示 Tab 列；單 session 時直接顯示格子
-const ROWS_PER_COL = 10;
 
 function StudentRoster({
   students,
@@ -728,13 +727,19 @@ function StudentRoster({
                   ...(isActive ? styles.tabActive : null),
                 }}
               >
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{label}</div>
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 700, fontSize: '1.5rem', lineHeight: 1.2 }}>{label}</div>
                 {subLabel && (
-                  <div style={{ fontSize: '0.78rem', color: isActive ? '#bfdbfe' : '#64748b', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subLabel}</div>
+                  <div style={{ fontSize: '0.85rem', color: isActive ? '#bfdbfe' : '#64748b', marginTop: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subLabel}</div>
                 )}
                 {stats && (
-                  <div style={styles.tabStats}>
-                    {stats.checkedIn}/{stats.total} 已到
+                  <div style={{ marginTop: '0.4rem', display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ background: isActive ? '#1e40af' : '#0f172a', border: `1px solid ${isActive ? '#93c5fd' : '#334155'}`, borderRadius: 6, padding: '0.15rem 0.55rem', fontSize: '1rem', fontWeight: 700, color: isActive ? '#fff' : '#94a3b8' }}>
+                      已到 {stats.checkedIn}
+                    </span>
+                    <span style={{ color: isActive ? '#bfdbfe' : '#475569', fontSize: '0.85rem' }}>/</span>
+                    <span style={{ background: isActive ? '#1e3a8a' : '#0f172a', border: `1px solid ${isActive ? '#60a5fa' : '#1e293b'}`, borderRadius: 6, padding: '0.15rem 0.55rem', fontSize: '1rem', fontWeight: 700, color: isActive ? '#e0f2fe' : '#64748b' }}>
+                      應到 {stats.total}
+                    </span>
                   </div>
                 )}
               </button>
@@ -748,7 +753,7 @@ function StudentRoster({
 }
 
 // ─── RosterGrid ───────────────────────────────────────────
-// 純格子渲染：每欄 10 人，字體隨欄數縮小，無捲軸
+// 自動計算欄數讓所有學生一頁呈現，無捲軸
 function RosterGrid({ students }: { students: RosterStudent[] }) {
   if (students.length === 0) {
     return (
@@ -758,14 +763,18 @@ function RosterGrid({ students }: { students: RosterStudent[] }) {
     );
   }
 
+  const total = students.length;
+  const numCols = Math.min(Math.max(1, Math.ceil(total / 10)), 12);
+  const rowsPerCol = Math.ceil(total / numCols);
+
   const cols: RosterStudent[][] = [];
-  for (let i = 0; i < students.length; i += ROWS_PER_COL) {
-    cols.push(students.slice(i, i + ROWS_PER_COL));
+  for (let i = 0; i < total; i += rowsPerCol) {
+    cols.push(students.slice(i, i + rowsPerCol));
   }
 
   const n = cols.length;
-  const nameFz = n <= 2 ? '1rem' : n <= 3 ? '0.9rem' : n <= 5 ? '0.8rem' : n <= 7 ? '0.7rem' : '0.62rem';
-  const idFz = n <= 2 ? '0.78rem' : n <= 4 ? '0.7rem' : '0.6rem';
+  const nameFz = n <= 2 ? '1.3rem' : n <= 3 ? '1.15rem' : n <= 5 ? '1rem' : n <= 7 ? '0.88rem' : '0.78rem';
+  const idFz   = n <= 2 ? '0.7rem'  : n <= 4 ? '0.65rem' : '0.58rem';
 
   return (
     <div style={{
@@ -809,8 +818,8 @@ function RosterGrid({ students }: { students: RosterStudent[] }) {
               </div>
             </div>
           ))}
-          {col.length < ROWS_PER_COL &&
-            Array.from({ length: ROWS_PER_COL - col.length }).map((_, i) => (
+          {col.length < rowsPerCol &&
+            Array.from({ length: rowsPerCol - col.length }).map((_, i) => (
               <div key={`pad-${i}`} style={{ flex: 1 }} />
             ))}
         </div>
@@ -979,7 +988,9 @@ function KioskKeyframes() {
 // ─── Styles ───────────────────────────────────────────────
 const styles: Record<string, React.CSSProperties> = {
   shell: {
-    minHeight: '100vh',
+    height: '100vh',
+    maxHeight: '100vh',
+    overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
     background: '#0f172a',
@@ -1074,7 +1085,7 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center' as const,
     lineHeight: 1.3,
     minWidth: 0,
-    minHeight: 68,
+    minHeight: 100,
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center',
