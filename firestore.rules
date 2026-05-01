@@ -58,5 +58,22 @@ service cloud.firestore {
     match /logs/{id}                   { allow read, write: if signedIn(); }
     match /instructors/{id}            { allow read, write: if signedIn(); }
     match /app_options/{id}            { allow read, write: if signedIn(); }
+
+    // 就業追蹤：登入可讀；hq_admin / branch_admin 可寫
+    function canWriteEmployment() {
+      return callerRole() == 'hq_admin' || callerRole() == 'branch_admin';
+    }
+    match /certificationRecords/{id} {
+      allow read: if signedIn();
+      allow write: if canWriteEmployment();
+    }
+    match /employmentStatuses/{id} {
+      allow read: if signedIn();
+      allow write: if canWriteEmployment();
+    }
+    match /coachingRecords/{id} {
+      allow read: if signedIn();
+      allow write: if canWriteEmployment();
+    }
   }
 }

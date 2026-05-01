@@ -1,13 +1,13 @@
 // 學生詳細頁（Task 014）
 //
-// 區塊：基本資料 / 所屬班級（Task 016 後填入） / 出席紀錄（Task 021 後填入） /
-//      人臉照片狀態（Phase 8 後填入）。
-// 為了不阻塞後續任務，每個區塊各自渲染並顯示「待後續任務串接」字樣。
+// Tab 1 - 基本資料：基本資料卡片、所屬班級、出席紀錄、人臉照片。
+// Tab 2 - 就業追蹤：證照紀錄、就業狀態歷程、輔導紀錄時間軸。
 
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 
+import { StudentEmploymentTab } from '../components/StudentEmploymentTab';
 import { StudentFacePhotos } from '../components/StudentFacePhotos';
 import { StudentFormDialog } from '../components/StudentFormDialog';
 import { useAuth } from '../hooks/useAuth';
@@ -18,6 +18,8 @@ import { canAccessBranch } from '../types/user';
 import { STUDENTS_COLLECTION, type StudentDoc } from '../types/student';
 import type { ClassStudentDoc } from '../types/classStudent';
 
+type Tab = 'profile' | 'employment';
+
 export function StudentDetailPage() {
   const { studentId } = useParams<{ studentId: string }>();
   const { user } = useAuth();
@@ -26,6 +28,7 @@ export function StudentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [enrollments, setEnrollments] = useState<ClassStudentDoc[]>([]);
+  const [activeTab, setActiveTab] = useState<Tab>('profile');
 
   useEffect(() => {
     if (!studentId) return;
@@ -58,7 +61,6 @@ export function StudentDetailPage() {
     );
   }
 
-  // 權限：學生資料屬於某分校；非 HQ 必須擁有該分校。
   if (user && !canAccessBranch(user, student.branchId)) {
     return (
       <section>
@@ -90,52 +92,77 @@ export function StudentDetailPage() {
         </button>
       </header>
 
-      <div style={styles.grid}>
-        <article style={styles.card}>
-          <h2 style={styles.h2}>基本資料</h2>
-          <dl style={styles.dl}>
-            <DT label="姓名">{student.name}</DT>
-            <DT label="學號"><code>{student.studentId}</code></DT>
-            <DT label="年級">{student.grade || '—'}</DT>
-            <DT label="分校">{branchName}（<code>{student.branchId}</code>）</DT>
-            <DT label="家長姓名">{student.parentName || '—'}</DT>
-            <DT label="家長電話">{student.parentPhone || '—'}</DT>
-            <DT label="狀態">{student.active ? '啟用' : '停用'}</DT>
-          </dl>
-        </article>
-
-        <article style={styles.card}>
-          <h2 style={styles.h2}>所屬班級</h2>
-          {enrollments.length === 0 ? (
-            <p style={styles.placeholder}>尚未加入任何班級</p>
-          ) : (
-            <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
-              {enrollments.map((e) => (
-                <li key={e.id} style={{ marginBottom: '0.25rem' }}>
-                  <code>{e.classId}</code>
-                  {!e.active && (
-                    <span style={{ color: '#9ca3af', fontSize: '0.8rem', marginLeft: '0.4rem' }}>
-                      （已退出）
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </article>
-
-        <article style={styles.card}>
-          <h2 style={styles.h2}>最近出席紀錄</h2>
-          <p style={styles.placeholder}>
-            出席紀錄（attendance_records）將於 Phase 5 / Task 021 後顯示。
-          </p>
-        </article>
-
-        <article style={styles.card}>
-          <h2 style={styles.h2}>人臉照片狀態</h2>
-          <StudentFacePhotos student={student} />
-        </article>
+      {/* Tab navigation */}
+      <div style={styles.tabBar}>
+        {([
+          { key: 'profile', label: '基本資料' },
+          { key: 'employment', label: '就業追蹤' },
+        ] as { key: Tab; label: string }[]).map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            style={activeTab === key ? styles.tabActive : styles.tab}
+            onClick={() => setActiveTab(key)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
+
+      {/* Tab: 基本資料 */}
+      {activeTab === 'profile' && (
+        <div style={styles.grid}>
+          <article style={styles.card}>
+            <h2 style={styles.h2}>基本資料</h2>
+            <dl style={styles.dl}>
+              <DT label="姓名">{student.name}</DT>
+              <DT label="學號"><code>{student.studentId}</code></DT>
+              <DT label="年級">{student.grade || '—'}</DT>
+              <DT label="分校">{branchName}（<code>{student.branchId}</code>）</DT>
+              <DT label="家長姓名">{student.parentName || '—'}</DT>
+              <DT label="家長電話">{student.parentPhone || '—'}</DT>
+              <DT label="狀態">{student.active ? '啟用' : '停用'}</DT>
+            </dl>
+          </article>
+
+          <article style={styles.card}>
+            <h2 style={styles.h2}>所屬班級</h2>
+            {enrollments.length === 0 ? (
+              <p style={styles.placeholder}>尚未加入任何班級</p>
+            ) : (
+              <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
+                {enrollments.map((e) => (
+                  <li key={e.id} style={{ marginBottom: '0.25rem' }}>
+                    <code>{e.classId}</code>
+                    {!e.active && (
+                      <span style={{ color: '#9ca3af', fontSize: '0.8rem', marginLeft: '0.4rem' }}>
+                        （已退出）
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
+
+          <article style={styles.card}>
+            <h2 style={styles.h2}>最近出席紀錄</h2>
+            <p style={styles.placeholder}>
+              出席紀錄（attendance_records）將於 Phase 5 / Task 021 後顯示。
+            </p>
+          </article>
+
+          <article style={styles.card}>
+            <h2 style={styles.h2}>人臉照片狀態</h2>
+            <StudentFacePhotos student={student} />
+          </article>
+        </div>
+      )}
+
+      {/* Tab: 就業追蹤 */}
+      {activeTab === 'employment' && (
+        <StudentEmploymentTab studentId={student.studentId} enrollments={enrollments} />
+      )}
 
       <StudentFormDialog
         open={editing}
@@ -157,7 +184,7 @@ function DT({ label, children }: { label: string; children: React.ReactNode }) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' },
   back: { color: '#6b7280', fontSize: '0.9rem', display: 'inline-block', marginBottom: '0.5rem' },
   title: { margin: 0, fontSize: '1.5rem' },
   subtitle: { margin: '0.4rem 0 0', color: '#6b7280', fontSize: '0.9rem' },
@@ -169,6 +196,33 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 6,
     fontSize: '0.95rem',
     fontWeight: 600,
+  },
+  tabBar: {
+    display: 'flex',
+    gap: '0.25rem',
+    borderBottom: '2px solid #e5e7eb',
+    marginBottom: '1.25rem',
+  },
+  tab: {
+    padding: '0.5rem 1.1rem',
+    background: 'transparent',
+    border: 'none',
+    borderBottom: '2px solid transparent',
+    marginBottom: -2,
+    fontSize: '0.95rem',
+    color: '#6b7280',
+    cursor: 'pointer',
+  },
+  tabActive: {
+    padding: '0.5rem 1.1rem',
+    background: 'transparent',
+    border: 'none',
+    borderBottom: '2px solid #2563eb',
+    marginBottom: -2,
+    fontSize: '0.95rem',
+    color: '#2563eb',
+    fontWeight: 600,
+    cursor: 'pointer',
   },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' },
   card: {

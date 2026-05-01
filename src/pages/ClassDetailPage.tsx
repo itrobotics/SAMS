@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 
+import { EmploymentStatsSection } from '../components/EmploymentStatsSection';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { db } from '../services/firebase';
@@ -260,6 +261,12 @@ export function ClassDetailPage() {
           </ul>
         </article>
       </div>
+
+      {/* 就業統計 */}
+      <article style={{ ...styles.card, marginTop: '1rem' }}>
+        <h2 style={styles.h2}>就業統計</h2>
+        <EmploymentStatsSection courseId={klass.classId} />
+      </article>
     </section>
   );
 }

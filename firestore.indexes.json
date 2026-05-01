@@ -82,6 +82,54 @@
         { "fieldPath": "studentId", "order": "ASCENDING" },
         { "fieldPath": "active", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "certificationRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "studentId", "order": "ASCENDING" },
+        { "fieldPath": "examDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "certificationRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "courseId", "order": "ASCENDING" },
+        { "fieldPath": "examDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "employmentStatuses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "studentId", "order": "ASCENDING" },
+        { "fieldPath": "trackedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "employmentStatuses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "courseId", "order": "ASCENDING" },
+        { "fieldPath": "trackedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "coachingRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "studentId", "order": "ASCENDING" },
+        { "fieldPath": "contactAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "coachingRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "courseId", "order": "ASCENDING" },
+        { "fieldPath": "contactAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

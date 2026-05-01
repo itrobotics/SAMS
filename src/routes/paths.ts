@@ -15,4 +15,5 @@ export const ROUTES = {
   instructorSchedule: '/instructor-schedule',
   settings: '/settings',
   options: '/options',
+  employmentTracking: '/employment-tracking',
 } as const;

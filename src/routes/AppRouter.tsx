@@ -14,6 +14,7 @@ import { InstructorsPage } from '../pages/InstructorsPage';
 import { InstructorSchedulePage } from '../pages/InstructorSchedulePage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { OptionsPage } from '../pages/OptionsPage';
+import { EmploymentTrackingPage } from '../pages/EmploymentTrackingPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 import { AuthGuard } from './AuthGuard';
@@ -127,6 +128,15 @@ export function AppRouter() {
           element={
             <AuthGuard>
               <OptionsPage />
+            </AuthGuard>
+          }
+        />
+
+        <Route
+          path={ROUTES.employmentTracking}
+          element={
+            <AuthGuard>
+              <EmploymentTrackingPage />
             </AuthGuard>
           }
         />
