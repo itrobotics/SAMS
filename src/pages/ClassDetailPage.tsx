@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 
+import { ClassSchedule } from '../components/ClassSchedule';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { db } from '../services/firebase';
@@ -259,6 +260,10 @@ export function ClassDetailPage() {
             })}
           </ul>
         </article>
+      </div>
+
+      <div style={{ marginTop: '1rem' }}>
+        <ClassSchedule classId={klass.classId} instructorMap={instructorMap} />
       </div>
     </section>
   );

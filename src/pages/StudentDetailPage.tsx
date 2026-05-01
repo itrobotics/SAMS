@@ -10,6 +10,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 
 import { StudentFacePhotos } from '../components/StudentFacePhotos';
 import { StudentFormDialog } from '../components/StudentFormDialog';
+import { StudentLearningRecord } from '../components/StudentLearningRecord';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { db } from '../services/firebase';
@@ -124,12 +125,7 @@ export function StudentDetailPage() {
           )}
         </article>
 
-        <article style={styles.card}>
-          <h2 style={styles.h2}>最近出席紀錄</h2>
-          <p style={styles.placeholder}>
-            出席紀錄（attendance_records）將於 Phase 5 / Task 021 後顯示。
-          </p>
-        </article>
+        <StudentLearningRecord studentId={student.studentId} />
 
         <article style={styles.card}>
           <h2 style={styles.h2}>人臉照片狀態</h2>

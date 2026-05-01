@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { StudentFormDialog } from '../components/StudentFormDialog';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
+import { fetchStudentLearningHours } from '../services/learningHours';
 import { setStudentActive, subscribeStudents } from '../services/students';
 import { ROUTES } from '../routes/paths';
 import type { StudentDoc } from '../types/student';
@@ -160,18 +161,19 @@ export function StudentsPage() {
               <th style={styles.th}>家長</th>
               <th style={styles.th}>電話</th>
               <th style={styles.th}>狀態</th>
+              <th style={{ ...styles.th, textAlign: 'right' }}>累計時數</th>
               <th style={styles.th}>操作</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={8} style={styles.empty}>載入中…</td>
+                <td colSpan={9} style={styles.empty}>載入中…</td>
               </tr>
             )}
             {!loading && visible.length === 0 && (
               <tr>
-                <td colSpan={8} style={styles.empty}>沒有符合條件的學生</td>
+                <td colSpan={9} style={styles.empty}>沒有符合條件的學生</td>
               </tr>
             )}
             {visible.map((s) => (
@@ -188,6 +190,9 @@ export function StudentsPage() {
                   <span style={s.active ? styles.pillActive : styles.pillInactive}>
                     {s.active ? '啟用' : '停用'}
                   </span>
+                </td>
+                <td style={{ ...styles.td, textAlign: 'right' }}>
+                  <StudentHoursCell studentId={s.studentId} />
                 </td>
                 <td style={styles.td}>
                   <button type="button" style={styles.linkBtn} onClick={() => openEdit(s)}>
@@ -216,6 +221,25 @@ export function StudentsPage() {
         onSaved={() => {/* realtime listener 會更新清單 */}}
       />
     </section>
+  );
+}
+
+function StudentHoursCell({ studentId }: { studentId: string }) {
+  const [hours, setHours] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchStudentLearningHours(studentId)
+      .then((h) => { if (!cancelled) setHours(h); })
+      .catch(() => { if (!cancelled) setHours(0); });
+    return () => { cancelled = true; };
+  }, [studentId]);
+
+  if (hours === null) return <span style={{ color: '#d1d5db', fontSize: '0.85rem' }}>…</span>;
+  return (
+    <span style={{ fontWeight: hours > 0 ? 600 : 400, color: hours > 0 ? '#1d4ed8' : '#9ca3af' }}>
+      {hours.toFixed(1)} h
+    </span>
   );
 }
 

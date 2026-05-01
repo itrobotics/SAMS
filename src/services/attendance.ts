@@ -114,6 +114,40 @@ export function subscribeAttendanceForStudent(
   );
 }
 
+export function subscribeAttendanceForClass(
+  classId: string,
+  onChange: (records: AttendanceRecordDoc[]) => void,
+  onError?: (e: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(db, ATTENDANCE_RECORDS_COLLECTION),
+    where('classId', '==', classId),
+  );
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map(snapshotToRec)),
+    (err) => onError?.(err),
+  );
+}
+
+// 不限筆數的訂閱（StudentDetailPage 學習紀錄用）
+export function subscribeAllAttendanceForStudent(
+  studentId: string,
+  onChange: (records: AttendanceRecordDoc[]) => void,
+  onError?: (e: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(db, ATTENDANCE_RECORDS_COLLECTION),
+    where('studentId', '==', studentId),
+    orderBy('sessionId', 'desc'),
+  );
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map(snapshotToRec)),
+    (err) => onError?.(err),
+  );
+}
+
 interface UpdateAttendanceInput {
   status: AttendanceStatus;
   method?: AttendanceMethod | null;
