@@ -28,6 +28,9 @@ export interface StudentDoc {
   emergencyContactRelation: string;
   notes: string;
   active: boolean;
+  // F4 班級分析用（選填）
+  educationLevel?: string; // 高中以下/高中/大學/碩士/博士/其他
+  department?: string;     // 科系（自由文字）
   createdAt?: Timestamp;
 }
 

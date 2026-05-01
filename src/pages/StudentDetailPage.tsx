@@ -14,9 +14,11 @@ import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { db } from '../services/firebase';
 import { subscribeStudentClasses } from '../services/classStudents';
+import { fetchStudentSurveyHistory } from '../services/surveys';
 import { canAccessBranch } from '../types/user';
 import { STUDENTS_COLLECTION, type StudentDoc } from '../types/student';
 import type { ClassStudentDoc } from '../types/classStudent';
+import type { SurveyResponseDoc } from '../types/survey';
 
 export function StudentDetailPage() {
   const { studentId } = useParams<{ studentId: string }>();
@@ -26,6 +28,7 @@ export function StudentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [enrollments, setEnrollments] = useState<ClassStudentDoc[]>([]);
+  const [surveyHistory, setSurveyHistory] = useState<SurveyResponseDoc[] | null>(null);
 
   useEffect(() => {
     if (!studentId) return;
@@ -45,6 +48,11 @@ export function StudentDetailPage() {
     if (!studentId) return;
     const unsub = subscribeStudentClasses(studentId, setEnrollments);
     return unsub;
+  }, [studentId]);
+
+  useEffect(() => {
+    if (!studentId) return;
+    fetchStudentSurveyHistory(studentId).then(setSurveyHistory);
   }, [studentId]);
 
   if (loading) return <div style={{ color: '#6b7280' }}>載入中…</div>;
@@ -129,6 +137,64 @@ export function StudentDetailPage() {
           <p style={styles.placeholder}>
             出席紀錄（attendance_records）將於 Phase 5 / Task 021 後顯示。
           </p>
+        </article>
+
+        <article style={styles.card}>
+          <h2 style={styles.h2}>問卷填寫記錄</h2>
+          {surveyHistory === null && (
+            <p style={styles.placeholder}>載入中…</p>
+          )}
+          {surveyHistory !== null && surveyHistory.length === 0 && (
+            <p style={styles.placeholder}>尚無問卷填寫記錄</p>
+          )}
+          {surveyHistory !== null && surveyHistory.length > 0 && (
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+              {surveyHistory.map((r) => (
+                <li
+                  key={r.responseId}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0.5rem 0',
+                    borderBottom: '1px solid #f3f4f6',
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  <div>
+                    <code style={{ fontSize: '0.8rem', color: '#6b7280' }}>{r.sessionId}</code>
+                    <span
+                      style={{
+                        marginLeft: '0.5rem',
+                        padding: '0.1rem 0.4rem',
+                        borderRadius: 10,
+                        fontSize: '0.75rem',
+                        background: r.status === 'submitted' ? '#dcfce7' : '#f3f4f6',
+                        color: r.status === 'submitted' ? '#166534' : '#6b7280',
+                      }}
+                    >
+                      {r.status === 'submitted' ? '已填' : '待填'}
+                    </span>
+                  </div>
+                  {r.status === 'pending' && (
+                    <a
+                      href={`/survey/${r.responseId}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: '#2563eb', fontSize: '0.8rem', textDecoration: 'none' }}
+                    >
+                      填寫 ↗
+                    </a>
+                  )}
+                  {r.submittedAt && (
+                    <span style={{ color: '#9ca3af', fontSize: '0.78rem' }}>
+                      {r.submittedAt.toDate().toLocaleDateString('zh-TW')}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </article>
 
         <article style={styles.card}>

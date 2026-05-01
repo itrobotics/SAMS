@@ -16,6 +16,11 @@ import {
 } from '../hooks/useRealtime';
 import { updateAttendance } from '../services/attendance';
 import { subscribeBranchSettings } from '../services/settings';
+import {
+  sendSurveyForSession,
+  subscribeSessionSurveyResponses,
+  computeSurveyStats,
+} from '../services/surveys';
 import { ROUTES } from '../routes/paths';
 import { decideManualCheckinStatus } from '../utils/attendance';
 import { formatTimeWithSec } from '../utils/date';
@@ -27,6 +32,10 @@ import {
   type AttendanceRecordDoc,
   type AttendanceStatus,
 } from '../types/attendance';
+import {
+  DEFAULT_SURVEY_QUESTIONS,
+  type SurveyResponseDoc,
+} from '../types/survey';
 
 export function SessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -40,6 +49,9 @@ export function SessionPage() {
   const sessionLoading = sessionRT.loading;
   const [busyId, setBusyId] = useState<string | null>(null);
   const [settings, setSettings] = useState<BranchSettings | null>(null);
+  const [surveyResponses, setSurveyResponses] = useState<SurveyResponseDoc[]>([]);
+  const [surveySending, setSurveySending] = useState(false);
+  const [showSurveyStats, setShowSurveyStats] = useState(false);
 
   // 訂閱該分校設定（取 graceMinutes）
   useEffect(() => {
@@ -48,6 +60,13 @@ export function SessionPage() {
     const unsub = subscribeBranchSettings(branchId, setSettings);
     return unsub;
   }, [session]);
+
+  // 訂閱問卷回覆
+  useEffect(() => {
+    if (!sessionId) return;
+    const unsub = subscribeSessionSurveyResponses(sessionId, setSurveyResponses);
+    return unsub;
+  }, [sessionId]);
 
   // 手動報到：
   //   target='CHECKED_IN' → 依 graceMinutes 自動分流為 CHECKED_IN 或 LATE
@@ -78,6 +97,32 @@ export function SessionPage() {
       window.alert(e instanceof Error ? e.message : '操作失敗');
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function handleSendSurvey() {
+    if (!sessionId || !session) return;
+    const presentRecords = records.filter(
+      (r) => r.status === 'CHECKED_IN' || r.status === 'LATE',
+    );
+    if (presentRecords.length === 0) {
+      window.alert('尚無出席學員，無法發送問卷。');
+      return;
+    }
+    setSurveySending(true);
+    try {
+      const count = await sendSurveyForSession(
+        sessionId,
+        session.classId,
+        session.branchId,
+        presentRecords,
+      );
+      window.alert(count > 0 ? `已為 ${count} 位學員建立問卷。` : '問卷已全部建立（無新增）。');
+      setShowSurveyStats(true);
+    } catch {
+      window.alert('發送問卷失敗，請稍後再試。');
+    } finally {
+      setSurveySending(false);
     }
   }
 
@@ -136,6 +181,32 @@ export function SessionPage() {
         <SummaryPill label="請假" value={counts.LEAVE} status="LEAVE" />
         <SummaryPill label="未到" value={counts.ABSENT + counts.SCHEDULED} status="ABSENT" />
       </div>
+
+      {/* 問卷區塊 */}
+      <div style={styles.surveyBar}>
+        {surveyResponses.length === 0 ? (
+          <button
+            type="button"
+            style={styles.surveyBtn}
+            onClick={handleSendSurvey}
+            disabled={surveySending}
+          >
+            {surveySending ? '發送中…' : '📋 發送問卷'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            style={{ ...styles.surveyBtn, background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0' }}
+            onClick={() => setShowSurveyStats((v) => !v)}
+          >
+            📊 問卷統計（{surveyResponses.filter((r) => r.status === 'submitted').length}/{surveyResponses.length} 份已填）
+          </button>
+        )}
+      </div>
+
+      {showSurveyStats && surveyResponses.length > 0 && (
+        <SurveyStatsSection responses={surveyResponses} sessionId={sessionId ?? ''} />
+      )}
 
       <div style={styles.tableWrap}>
         <table style={styles.table}>
@@ -281,6 +352,101 @@ function SummaryPill({ label, value, status }: { label: string; value: number; s
   );
 }
 
+function SurveyStatsSection({
+  responses,
+  sessionId,
+}: {
+  responses: SurveyResponseDoc[];
+  sessionId: string;
+}) {
+  const yesNoIds = DEFAULT_SURVEY_QUESTIONS
+    .filter((q) => q.type === 'yesno')
+    .map((q) => q.id);
+  const allIds = DEFAULT_SURVEY_QUESTIONS.map((q) => q.id);
+  const stats = computeSurveyStats(responses, allIds, yesNoIds);
+
+  return (
+    <div style={styles.surveyCard}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h3 style={{ margin: 0, fontSize: '1rem', color: '#374151' }}>問卷統計</h3>
+        <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+          回覆率：{(stats.responseRate * 100).toFixed(0)}%（{stats.submitted}/{stats.total}）
+        </span>
+      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+        <thead>
+          <tr>
+            <th style={styles.sth}>題目</th>
+            <th style={styles.sth}>結果</th>
+            <th style={styles.sth}>問卷連結</th>
+          </tr>
+        </thead>
+        <tbody>
+          {DEFAULT_SURVEY_QUESTIONS.map((q) => {
+            const avg = stats.averages[String(q.id)];
+            const yesno = stats.yesNoCounts[String(q.id)];
+            return (
+              <tr key={q.id}>
+                <td style={styles.std}>{q.id}. {q.text}</td>
+                <td style={styles.std}>
+                  {q.type === 'scale5'
+                    ? avg !== null
+                      ? `${avg.toFixed(2)} 分`
+                      : '—'
+                    : yesno
+                      ? `是 ${yesno.yes} / 否 ${yesno.no} / 部分 ${yesno.partial}`
+                      : '—'}
+                </td>
+                <td style={styles.std} />
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div style={{ marginTop: '1rem', borderTop: '1px solid #e5e7eb', paddingTop: '0.75rem' }}>
+        <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem', color: '#6b7280', fontWeight: 600 }}>
+          個人問卷連結
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', maxHeight: 180, overflow: 'auto' }}>
+          {responses.map((r) => (
+            <div key={r.responseId} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+              <span style={{ minWidth: 80 }}>{r.studentName}</span>
+              <span style={{
+                padding: '0.1rem 0.4rem', borderRadius: 10, fontSize: '0.75rem',
+                background: r.status === 'submitted' ? '#dcfce7' : '#f3f4f6',
+                color: r.status === 'submitted' ? '#166534' : '#6b7280',
+              }}>
+                {r.status === 'submitted' ? '已填' : '待填'}
+              </span>
+              <a
+                href={`/survey/${r.responseId}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: '#2563eb', textDecoration: 'none', fontSize: '0.8rem' }}
+              >
+                填寫連結 ↗
+              </a>
+              <button
+                type="button"
+                style={{ padding: '0.1rem 0.4rem', fontSize: '0.75rem', border: '1px solid #d1d5db', borderRadius: 4, background: '#fff', cursor: 'pointer' }}
+                onClick={() => {
+                  const url = `${window.location.origin}/survey/${r.responseId}`;
+                  navigator.clipboard.writeText(url).then(() => window.alert('連結已複製'));
+                }}
+              >
+                複製
+              </button>
+            </div>
+          ))}
+        </div>
+        <p style={{ margin: '0.5rem 0 0', fontSize: '0.75rem', color: '#9ca3af' }}>
+          場次 ID：{sessionId}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 const styles: Record<string, React.CSSProperties> = {
   header: { marginBottom: '1.25rem' },
   back: { color: '#6b7280', fontSize: '0.9rem', display: 'inline-block', marginBottom: '0.5rem' },
@@ -309,4 +475,28 @@ const styles: Record<string, React.CSSProperties> = {
   td: { padding: '0.65rem 1rem', borderBottom: '1px solid #f3f4f6' },
   empty: { padding: '2rem', textAlign: 'center', color: '#9ca3af' },
   studentIdMeta: { color: '#9ca3af', fontSize: '0.8rem', marginLeft: '0.5rem' },
+  surveyBar: { marginBottom: '1rem' },
+  surveyBtn: {
+    padding: '0.5rem 1.1rem',
+    background: '#2563eb',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 6,
+    fontSize: '0.9rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  surveyCard: {
+    background: '#fff',
+    borderRadius: 8,
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+    padding: '1.25rem',
+    marginBottom: '1rem',
+    border: '1px solid #e5e7eb',
+  },
+  sth: {
+    textAlign: 'left', padding: '0.5rem 0.75rem', borderBottom: '1px solid #e5e7eb',
+    background: '#f9fafb', fontWeight: 600, fontSize: '0.85rem',
+  },
+  std: { padding: '0.5rem 0.75rem', borderBottom: '1px solid #f3f4f6', verticalAlign: 'top' },
 };

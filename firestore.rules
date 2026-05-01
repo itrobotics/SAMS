@@ -58,5 +58,10 @@ service cloud.firestore {
     match /logs/{id}                   { allow read, write: if signedIn(); }
     match /instructors/{id}            { allow read, write: if signedIn(); }
     match /app_options/{id}            { allow read, write: if signedIn(); }
+
+    // F3 滿意度調查：
+    //   survey_responses 允許公開讀寫，responseId 作為一次性 token（填寫頁無需登入）。
+    //   管理端統計需登入（在 subscribeSessionSurveyResponses 中已靠 query 限縮）。
+    match /survey_responses/{id}       { allow read, write: if true; }
   }
 }
