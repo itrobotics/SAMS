@@ -190,8 +190,8 @@ export function StudentsPage() {
               <th style={styles.th}>類型</th>
               <th style={styles.th}>年級 / 學歷</th>
               <th style={styles.th}>分校</th>
-              <th style={styles.th}>聯絡人</th>
-              <th style={styles.th}>電話</th>
+              <th style={styles.th}>手機 / 電話1</th>
+              <th style={styles.th}>Email</th>
               <th style={styles.th}>狀態</th>
               <th style={styles.th}>操作</th>
             </tr>
@@ -225,8 +225,8 @@ export function StudentsPage() {
                 </td>
                 <td style={styles.td}>{(isChild ? cv?.grade : ap?.education) || '—'}</td>
                 <td style={styles.td}>{branchName(s.branchId)}</td>
-                <td style={styles.td}>{(isChild ? cv?.parent1Name : ap?.company) || '—'}</td>
-                <td style={styles.td}>{(isChild ? cv?.parent1Phone : '') || '—'}</td>
+                <td style={styles.td}>{(isChild ? cv?.parent1Phone : ap?.mobilePhone) || '—'}</td>
+                <td style={styles.td}>{(isChild ? cv?.parent1Email : ap?.email) || '—'}</td>
                 <td style={styles.td}>
                   <span style={s.active ? styles.pillActive : styles.pillInactive}>
                     {s.active ? '啟用' : '停用'}

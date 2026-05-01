@@ -75,6 +75,9 @@ export function StudentFormDialog({
   const [adultCompany, setAdultCompany] = useState('');
   const [adultJobTitle, setAdultJobTitle] = useState('');
   const [adultIdNumber, setAdultIdNumber] = useState('');
+  const [adultMobilePhone, setAdultMobilePhone] = useState('');
+  const [adultHomePhone, setAdultHomePhone] = useState('');
+  const [adultEmail, setAdultEmail] = useState('');
 
   const [mailingAddr, setMailingAddr] = useState<AddressValue>(EMPTY_ADDR);
   const [regSameAsMailing, setRegSameAsMailing] = useState(false);
@@ -124,6 +127,9 @@ export function StudentFormDialog({
     setAdultCompany(ap?.company ?? '');
     setAdultJobTitle(ap?.jobTitle ?? '');
     setAdultIdNumber(ap?.idNumber ?? '');
+    setAdultMobilePhone(ap?.mobilePhone ?? '');
+    setAdultHomePhone(ap?.homePhone ?? '');
+    setAdultEmail(ap?.email ?? '');
 
     setMailingAddr({
       city: initial?.mailingCity ?? '',
@@ -164,6 +170,7 @@ export function StudentFormDialog({
       } else {
         setAdultEducation(''); setAdultGraduateSchool(''); setAdultMajor('');
         setAdultCompany(''); setAdultJobTitle(''); setAdultIdNumber('');
+        setAdultMobilePhone(''); setAdultHomePhone(''); setAdultEmail('');
       }
     }
     setProfileType(next);
@@ -199,6 +206,9 @@ export function StudentFormDialog({
         company: adultCompany,
         jobTitle: adultJobTitle,
         idNumber: adultIdNumber,
+        mobilePhone: adultMobilePhone,
+        homePhone: adultHomePhone,
+        email: adultEmail,
       } : null;
 
       if (isEdit && initial) {
@@ -381,7 +391,7 @@ export function StudentFormDialog({
           </div>
         ) : (
           <div style={styles.profileGroup}>
-            <div style={styles.profileGroupTitle}>學歷 / 工作資料</div>
+            <div style={styles.profileGroupTitle}>學歷 / 工作 / 聯絡資料</div>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <div style={{ ...formStyles.field, flex: 1 }}>
                 <label style={formStyles.label}>最高學歷</label>
@@ -427,6 +437,28 @@ export function StudentFormDialog({
                   onChange={(e) => setAdultJobTitle(e.target.value)}
                   placeholder="例：工程師" disabled={submitting} />
               </div>
+            </div>
+            {/* 聯絡資訊 */}
+            <div style={styles.profileSubTitle}>聯絡資訊</div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div style={{ ...formStyles.field, flex: 1 }}>
+                <label style={formStyles.label}>手機</label>
+                <input type="tel" style={formStyles.input} value={adultMobilePhone}
+                  onChange={(e) => setAdultMobilePhone(e.target.value)}
+                  placeholder="09xxxxxxxx" disabled={submitting} />
+              </div>
+              <div style={{ ...formStyles.field, flex: 1 }}>
+                <label style={formStyles.label}>家裡電話</label>
+                <input type="tel" style={formStyles.input} value={adultHomePhone}
+                  onChange={(e) => setAdultHomePhone(e.target.value)}
+                  placeholder="02-xxxxxxxx" disabled={submitting} />
+              </div>
+            </div>
+            <div style={formStyles.field}>
+              <label style={formStyles.label}>E-mail</label>
+              <input type="email" style={formStyles.input} value={adultEmail}
+                onChange={(e) => setAdultEmail(e.target.value)}
+                placeholder="example@email.com" disabled={submitting} />
             </div>
           </div>
         )}
@@ -542,5 +574,14 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#374151',
     fontWeight: 600,
     marginBottom: '0.5rem',
+  },
+  profileSubTitle: {
+    fontSize: '0.78rem',
+    color: '#6b7280',
+    fontWeight: 600,
+    marginTop: '0.5rem',
+    marginBottom: '0.25rem',
+    borderTop: '1px solid #e5e7eb',
+    paddingTop: '0.5rem',
   },
 };

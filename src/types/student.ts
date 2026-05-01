@@ -39,6 +39,9 @@ export interface AdultProfile {
   company?: string;
   jobTitle?: string;
   idNumber?: string;      // 身分證字號（職訓課程報名用）
+  mobilePhone?: string;   // 手機
+  homePhone?: string;     // 家裡電話
+  email?: string;         // E-mail
 }
 
 export interface StudentDoc {

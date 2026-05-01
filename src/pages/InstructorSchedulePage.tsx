@@ -161,8 +161,12 @@ export function InstructorSchedulePage() {
               return (
                 <tr key={`${c.classId}-${instructorId}-${i}`}>
                   <td style={styles.td}>
-                    <strong>{instructorId}</strong>
-                    {iname ? <span style={styles.meta}> {iname}</span> : null}
+                    <span>{iname || instructorId}</span>
+                    {iname && (
+                      <span style={{ fontSize: '0.72rem', color: '#9ca3af', marginLeft: '0.35rem' }}>
+                        {instructorId}
+                      </span>
+                    )}
                   </td>
                   <td style={styles.td}>{branchName(c.branchId)}</td>
                   <td style={styles.td}>

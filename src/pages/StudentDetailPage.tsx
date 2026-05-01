@@ -119,9 +119,10 @@ export function StudentDetailPage() {
       </header>
 
       <div style={styles.grid}>
+        {/* 卡片 1：基本資料（共用） */}
         <article style={styles.card}>
           <h2 style={styles.h2}>
-            學籍資料
+            基本資料
             <span style={isChild ? styles.pillChild : styles.pillAdult}>
               {PROFILE_TYPE_LABELS[profileType]}
             </span>
@@ -130,35 +131,55 @@ export function StudentDetailPage() {
             <DT label="姓名">{student.name}</DT>
             <DT label="學號"><code>{student.studentId}</code></DT>
             <DT label="分校">{branchName}（<code>{student.branchId}</code>）</DT>
-            {isChild && childView && (
-              <>
-                <DT label="年級">{childView.grade || '—'}</DT>
-                <DT label="就讀學校">{childView.school || '—'}</DT>
-                <DT label="家長 1 姓名">{childView.parent1Name || '—'}</DT>
-                <DT label="家長 1 電話">{childView.parent1Phone || '—'}</DT>
-                <DT label="家長 1 Email">{childView.parent1Email || '—'}</DT>
-                {(childView.parent2Name || childView.parent2Phone) && (
-                  <>
-                    <DT label="家長 2 姓名">{childView.parent2Name || '—'}</DT>
-                    <DT label="家長 2 電話">{childView.parent2Phone || '—'}</DT>
-                  </>
-                )}
-              </>
-            )}
-            {!isChild && (
-              <>
-                <DT label="生日">{adult?.birthDate || student.birthday || '—'}</DT>
-                <DT label="最高學歷">{adult?.education || '—'}</DT>
-                <DT label="畢業學校">{adult?.graduateSchool || '—'}</DT>
-                <DT label="科系">{adult?.major || '—'}</DT>
-                <DT label="任職公司">{adult?.company || '—'}</DT>
-                <DT label="職稱">{adult?.jobTitle || '—'}</DT>
-                {adult?.idNumber && <DT label="身分證字號">{adult.idNumber}</DT>}
-              </>
-            )}
+            <DT label="性別">{student.gender === 'male' ? '男' : student.gender === 'female' ? '女' : '其他'}</DT>
+            <DT label="生日">{(isChild ? student.birthday : adult?.birthDate || student.birthday) || '—'}</DT>
             <DT label="狀態">{student.active ? '啟用' : '停用'}</DT>
           </dl>
         </article>
+
+        {/* 卡片 2：聯絡資訊（child → 家長, adult → 公司聯絡） */}
+        {isChild && childView ? (
+          <article style={styles.card}>
+            <h2 style={styles.h2}>家長聯絡</h2>
+            <dl style={styles.dl}>
+              <DT label="年級">{childView.grade || '—'}</DT>
+              <DT label="就讀學校">{childView.school || '—'}</DT>
+              <DT label="家長 1 姓名">{childView.parent1Name || '—'}</DT>
+              <DT label="家長 1 電話">{childView.parent1Phone || '—'}</DT>
+              <DT label="家長 1 Email">{childView.parent1Email || '—'}</DT>
+              {(childView.parent2Name || childView.parent2Phone) && (
+                <>
+                  <DT label="家長 2 姓名">{childView.parent2Name || '—'}</DT>
+                  <DT label="家長 2 電話">{childView.parent2Phone || '—'}</DT>
+                </>
+              )}
+            </dl>
+          </article>
+        ) : (
+          <article style={styles.card}>
+            <h2 style={styles.h2}>聯絡資訊</h2>
+            <dl style={styles.dl}>
+              <DT label="任職公司">{adult?.company || '—'}</DT>
+              <DT label="職稱">{adult?.jobTitle || '—'}</DT>
+              <DT label="手機">{adult?.mobilePhone || '—'}</DT>
+              <DT label="家裡電話">{adult?.homePhone || '—'}</DT>
+              <DT label="E-mail">{adult?.email || '—'}</DT>
+            </dl>
+          </article>
+        )}
+
+        {/* 卡片 3：學歷（adult only） */}
+        {!isChild && (
+          <article style={styles.card}>
+            <h2 style={styles.h2}>學歷</h2>
+            <dl style={styles.dl}>
+              <DT label="最高學歷">{adult?.education || '—'}</DT>
+              <DT label="畢業學校">{adult?.graduateSchool || '—'}</DT>
+              <DT label="科系">{adult?.major || '—'}</DT>
+              {adult?.idNumber && <DT label="身分證字號">{adult.idNumber}</DT>}
+            </dl>
+          </article>
+        )}
 
         <article style={styles.card}>
           <h2 style={styles.h2}>所屬班級</h2>
