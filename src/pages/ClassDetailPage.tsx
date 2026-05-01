@@ -25,6 +25,7 @@ import { ClassSchedule } from '../components/ClassSchedule';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { db } from '../services/firebase';
+import { StudentImportDialog } from '../components/StudentImportDialog';
 import {
   addStudentToClass,
   removeStudentFromClass,
@@ -578,4 +579,8 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid #fecaca', borderRadius: 6, fontSize: '0.85rem',
   },
   placeholder: { color: '#9ca3af', fontSize: '0.9rem', margin: '0.5rem 0', fontStyle: 'italic' },
+  importBtn: {
+    padding: '0.3rem 0.75rem', background: '#f0fdf4', color: '#166534',
+    border: '1px solid #bbf7d0', borderRadius: 6, fontSize: '0.85rem', cursor: 'pointer',
+  },
 };
