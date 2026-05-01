@@ -438,3 +438,54 @@ Task-008 HQ Dashboard KPI
 
 > ICE SAMS 是一套多分校補習班到校管理平台，以人臉辨識為特色入口，讓總部與分校即時掌握學生到校狀態，建立可複製的營運管理制度。
 
+---
+
+## 14. Multi-tenant Deployment（Silo 模型）
+
+SAMS 採用 **Silo 多租戶模型**：每個客戶（補習班）擁有獨立的 Firebase 專案，資料完全隔離。同一份程式碼透過不同的 `.env` 檔切換目標 Firebase 專案，不需要修改原始碼。
+
+### 14.1 設計原則
+
+- 每個客戶 = 一個獨立 Firebase 專案（獨立 Firestore / Auth / Storage / Hosting）
+- 程式碼共用，環境設定隔離
+- 真實 API key 不進 git；`.env` 由 `.gitignore` 排除，`.env.example` 為範本
+
+### 14.2 環境變數
+
+`src/services/firebase.ts` 讀取 `import.meta.env`，由 Vite 在 build 時注入：
+
+```text
+VITE_FIREBASE_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN
+VITE_FIREBASE_PROJECT_ID
+VITE_FIREBASE_STORAGE_BUCKET
+VITE_FIREBASE_MESSAGING_SENDER_ID
+VITE_FIREBASE_APP_ID
+VITE_FIREBASE_MEASUREMENT_ID
+```
+
+### 14.3 新客戶部署流程
+
+1. 為該客戶在 Firebase Console 建立全新專案，啟用 Firestore / Auth / Storage / Hosting
+2. 取得該專案的 Web App config
+3. 在本地 clone 程式碼後：
+   - 複製 `.env.example` 為 `.env`
+   - 填入該客戶的 Firebase config
+4. 部署：
+
+   ```bash
+   firebase deploy --only firestore:rules --project <projectId>
+   firebase deploy --only storage         --project <projectId>
+   npm run build
+   firebase deploy --only hosting         --project <projectId>
+   ```
+
+   或一次跑完整套部署（rules + build + hosting，依本專案慣例）。
+5. 部署完成後，於該客戶 Firebase Console 建立首位 HQ_ADMIN 帳號，後續分校 / 班級 / 學生資料由客戶自行建立。
+
+### 14.4 注意事項
+
+- `.env` 永遠不可 commit；切換客戶時請重新複製
+- 不同客戶的 Firestore rules / Storage rules / indexes 同樣以該客戶專案為部署目標
+- 程式碼層面不需要區分客戶；客戶間的差異只能透過資料（settings collection 等）表達，不可寫死在 code 裡
+
