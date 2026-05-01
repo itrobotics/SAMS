@@ -18,6 +18,7 @@ import { InstructorsPage } from '../pages/InstructorsPage';
 import { InstructorSchedulePage } from '../pages/InstructorSchedulePage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { OptionsPage } from '../pages/OptionsPage';
+import { EmploymentTrackingPage } from '../pages/EmploymentTrackingPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 import { SurveyFillPage } from '../pages/SurveyFillPage';

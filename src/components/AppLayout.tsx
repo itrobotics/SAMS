@@ -37,6 +37,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { to: ROUTES.instructorSchedule, label: '排課清單', show: true },
     { to: ROUTES.settings, label: '設定', show: isHQ },
     { to: ROUTES.options, label: '選項管理', show: isHQ },
+    { to: ROUTES.employmentTracking, label: '就業追蹤', show: true },
   ];
 
   async function handleLogout() {

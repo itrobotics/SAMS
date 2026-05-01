@@ -12,6 +12,7 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@types/recharts": "^1.8.29",
     "face-api.js": "^0.22.2",
     "firebase": "^10.14.1",
     "react": "^18.3.1",
