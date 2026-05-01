@@ -92,6 +92,7 @@ export function InstructorsPage() {
             <tr>
               <th style={styles.th}>講師編號</th>
               <th style={styles.th}>姓名</th>
+              <th style={styles.th}>任職公司 / 職稱</th>
               <th style={styles.th}>可教授課程</th>
               <th style={styles.th}>聯絡電話</th>
               <th style={styles.th}>狀態</th>
@@ -100,15 +101,20 @@ export function InstructorsPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={6} style={styles.empty}>載入中…</td></tr>
+              <tr><td colSpan={7} style={styles.empty}>載入中…</td></tr>
             )}
             {!loading && visible.length === 0 && (
-              <tr><td colSpan={6} style={styles.empty}>沒有符合條件的講師</td></tr>
+              <tr><td colSpan={7} style={styles.empty}>沒有符合條件的講師</td></tr>
             )}
             {visible.map((inst) => (
               <tr key={inst.instructorId}>
                 <td style={styles.td}><code>{inst.instructorId}</code></td>
                 <td style={styles.td}>{inst.name}</td>
+                <td style={styles.td}>
+                  {inst.company
+                    ? <>{inst.company}{inst.jobTitle && <span style={{ color: '#6b7280', fontSize: '0.85rem' }}> · {inst.jobTitle}</span>}</>
+                    : <span style={{ color: '#9ca3af' }}>—</span>}
+                </td>
                 <td style={styles.td}>
                   {inst.courses.length > 0
                     ? inst.courses.join('、')

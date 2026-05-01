@@ -41,6 +41,8 @@ export interface InstructorDoc {
   registeredAddress: string;
   emergencyContactName: string;
   emergencyContactRelation: string;
+  company?: string;         // 任職公司（工作經歷）
+  jobTitle?: string;        // 職務名稱
   hourlyRate: string;
   totalTeachingHours: number;
   notes: string;

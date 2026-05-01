@@ -53,6 +53,8 @@ export function InstructorFormDialog({
   const [phone1, setPhone1] = useState('');
   const [phone2, setPhone2] = useState('');
   const [hourlyRate, setHourlyRate] = useState('');
+  const [company, setCompany] = useState('');
+  const [jobTitle, setJobTitle] = useState('');
   const [mailingAddr, setMailingAddr] = useState<AddressValue>(EMPTY_ADDR);
   const [registeredSame, setRegisteredSame] = useState(true);
   const [registeredAddr, setRegisteredAddr] = useState<AddressValue>(EMPTY_ADDR);
@@ -88,6 +90,8 @@ export function InstructorFormDialog({
     setPhone1(initial?.phone1 ?? '');
     setPhone2(initial?.phone2 ?? '');
     setHourlyRate(initial?.hourlyRate ?? '');
+    setCompany(initial?.company ?? '');
+    setJobTitle(initial?.jobTitle ?? '');
     setMailingAddr({
       city: initial?.mailingCity ?? '',
       district: initial?.mailingDistrict ?? '',
@@ -145,6 +149,8 @@ export function InstructorFormDialog({
         emergencyContactName: ecName,
         emergencyContactRelation: ecRelation,
         hourlyRate,
+        company,
+        jobTitle,
         totalTeachingHours: initial?.totalTeachingHours ?? 0,
         notes,
         active,
@@ -280,6 +286,23 @@ export function InstructorFormDialog({
             <label style={formStyles.label}>鐘點費</label>
             <input style={formStyles.input} value={hourlyRate}
               onChange={(e) => setHourlyRate(e.target.value)} placeholder="例：500" disabled={submitting} />
+          </div>
+        </div>
+
+        {/* 工作經歷 */}
+        <div style={sectionTitle}>工作經歷</div>
+        <div style={row2}>
+          <div style={{ ...formStyles.field, flex: 2 }}>
+            <label style={formStyles.label}>任職公司</label>
+            <input style={formStyles.input} value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              placeholder="例：艾鍗科技" disabled={submitting} />
+          </div>
+          <div style={{ ...formStyles.field, flex: 1 }}>
+            <label style={formStyles.label}>職務名稱</label>
+            <input style={formStyles.input} value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
+              placeholder="例：程式講師" disabled={submitting} />
           </div>
         </div>
 
