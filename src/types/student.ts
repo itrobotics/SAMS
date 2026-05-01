@@ -29,6 +29,19 @@ export interface StudentDoc {
   notes: string;
   active: boolean;
   createdAt?: Timestamp;
+  // 批次匯入延伸欄位（職訓系統）
+  phone?: string;
+  email?: string;
+  idNumber?: string;
+  profileType?: 'child' | 'adult';
+  education?: string;
+  graduateSchool?: string;
+  major?: string;
+  company?: string;
+  jobTitle?: string;
+  mobilePhone?: string;
+  homePhone?: string;
+  school?: string;
 }
 
 export interface NewStudentInput {
@@ -50,6 +63,18 @@ export interface NewStudentInput {
   emergencyContactName?: string;
   emergencyContactRelation?: string;
   notes?: string;
+  phone?: string;
+  email?: string;
+  idNumber?: string;
+  profileType?: 'child' | 'adult';
+  education?: string;
+  graduateSchool?: string;
+  major?: string;
+  company?: string;
+  jobTitle?: string;
+  mobilePhone?: string;
+  homePhone?: string;
+  school?: string;
 }
 
 export interface UpdateStudentInput {
@@ -71,6 +96,18 @@ export interface UpdateStudentInput {
   emergencyContactRelation?: string;
   notes?: string;
   active?: boolean;
+  phone?: string;
+  email?: string;
+  idNumber?: string;
+  profileType?: 'child' | 'adult';
+  education?: string;
+  graduateSchool?: string;
+  major?: string;
+  company?: string;
+  jobTitle?: string;
+  mobilePhone?: string;
+  homePhone?: string;
+  school?: string;
 }
 
 export const STUDENTS_COLLECTION = 'students';

@@ -11,6 +11,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { db } from '../services/firebase';
+import { StudentImportDialog } from '../components/StudentImportDialog';
 import {
   addStudentToClass,
   removeStudentFromClass,
@@ -36,6 +37,7 @@ export function ClassDetailPage() {
   const [candidateBranch, setCandidateBranch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   // 訂閱班級資料
   useEffect(() => {
@@ -180,9 +182,18 @@ export function ClassDetailPage() {
 
       <div style={styles.grid}>
         <article style={styles.card}>
-          <h2 style={styles.h2}>已加入學生（{activeRoster.length}）</h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+            <h2 style={{ ...styles.h2, margin: 0 }}>已加入學生（{activeRoster.length}）</h2>
+            <button
+              type="button"
+              style={styles.importBtn}
+              onClick={() => setImportOpen(true)}
+            >
+              ↑ 匯入學員
+            </button>
+          </div>
           {activeRoster.length === 0 && (
-            <p style={styles.placeholder}>還沒有學生加入此班級</p>
+            <p style={{ ...styles.placeholder, marginTop: 0 }}>還沒有學生加入此班級</p>
           )}
           <ul style={styles.list}>
             {activeRoster.map((r) => {
@@ -260,6 +271,14 @@ export function ClassDetailPage() {
           </ul>
         </article>
       </div>
+
+      <StudentImportDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        classId={classId!}
+        className={klass.name}
+        branchId={klass.branchId}
+      />
     </section>
   );
 }
@@ -332,4 +351,8 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid #fecaca', borderRadius: 6, fontSize: '0.85rem',
   },
   placeholder: { color: '#9ca3af', fontSize: '0.9rem', margin: '0.5rem 0', fontStyle: 'italic' },
+  importBtn: {
+    padding: '0.3rem 0.75rem', background: '#f0fdf4', color: '#166534',
+    border: '1px solid #bbf7d0', borderRadius: 6, fontSize: '0.85rem', cursor: 'pointer',
+  },
 };
