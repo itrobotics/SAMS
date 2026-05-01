@@ -20,6 +20,7 @@ import { SettingsPage } from '../pages/SettingsPage';
 import { OptionsPage } from '../pages/OptionsPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
+import { SurveyFillPage } from '../pages/SurveyFillPage';
 import { AuthGuard } from './AuthGuard';
 import { ROUTES } from './paths';
 
@@ -166,6 +167,9 @@ export function AppRouter() {
             </AuthGuard>
           }
         />
+
+        {/* 問卷填寫頁：無需登入 */}
+        <Route path={ROUTES.surveyFill()} element={<SurveyFillPage />} />
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

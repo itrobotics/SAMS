@@ -240,6 +240,64 @@ export function StudentDetailPage() {
         </article>
 
         <article style={styles.card}>
+          <h2 style={styles.h2}>問卷填寫記錄</h2>
+          {surveyHistory === null && (
+            <p style={styles.placeholder}>載入中…</p>
+          )}
+          {surveyHistory !== null && surveyHistory.length === 0 && (
+            <p style={styles.placeholder}>尚無問卷填寫記錄</p>
+          )}
+          {surveyHistory !== null && surveyHistory.length > 0 && (
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+              {surveyHistory.map((r) => (
+                <li
+                  key={r.responseId}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0.5rem 0',
+                    borderBottom: '1px solid #f3f4f6',
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  <div>
+                    <code style={{ fontSize: '0.8rem', color: '#6b7280' }}>{r.sessionId}</code>
+                    <span
+                      style={{
+                        marginLeft: '0.5rem',
+                        padding: '0.1rem 0.4rem',
+                        borderRadius: 10,
+                        fontSize: '0.75rem',
+                        background: r.status === 'submitted' ? '#dcfce7' : '#f3f4f6',
+                        color: r.status === 'submitted' ? '#166534' : '#6b7280',
+                      }}
+                    >
+                      {r.status === 'submitted' ? '已填' : '待填'}
+                    </span>
+                  </div>
+                  {r.status === 'pending' && (
+                    <a
+                      href={`/survey/${r.responseId}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: '#2563eb', fontSize: '0.8rem', textDecoration: 'none' }}
+                    >
+                      填寫 ↗
+                    </a>
+                  )}
+                  {r.submittedAt && (
+                    <span style={{ color: '#9ca3af', fontSize: '0.78rem' }}>
+                      {r.submittedAt.toDate().toLocaleDateString('zh-TW')}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+
+        <article style={styles.card}>
           <h2 style={styles.h2}>人臉照片狀態</h2>
           <StudentFacePhotos student={student} />
         </article>

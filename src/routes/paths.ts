@@ -20,4 +20,5 @@ export const ROUTES = {
   instructorSchedule: '/instructor-schedule',
   settings: '/settings',
   options: '/options',
+  surveyFill: (responseId = ':responseId') => `/survey/${responseId}`,
 } as const;
