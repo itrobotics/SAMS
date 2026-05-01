@@ -25,6 +25,7 @@ import { ClassSchedule } from '../components/ClassSchedule';
 import { useAuth } from '../hooks/useAuth';
 import { useBranches } from '../hooks/useBranches';
 import { db } from '../services/firebase';
+import { EmploymentStatsSection } from '../components/EmploymentStatsSection';
 import { StudentImportDialog } from '../components/StudentImportDialog';
 import {
   addStudentToClass,
@@ -278,7 +279,8 @@ export function ClassDetailPage() {
   const [candidateBranch, setCandidateBranch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'roster' | 'analysis'>('roster');
+  const [activeTab, setActiveTab] = useState<'roster' | 'analysis' | 'schedule' | 'employment'>('roster');
+  const [showImport, setShowImport] = useState(false);
 
   // 訂閱班級資料
   useEffect(() => {
@@ -437,17 +439,142 @@ export function ClassDetailPage() {
         >
           學員分析
         </button>
+        <button
+          type="button"
+          style={activeTab === 'schedule' ? styles.tabActive : styles.tab}
+          onClick={() => setActiveTab('schedule')}
+        >
+          課表
+        </button>
+        <button
+          type="button"
+          style={activeTab === 'employment' ? styles.tabActive : styles.tab}
+          onClick={() => setActiveTab('employment')}
+        >
+          就業追蹤
+        </button>
       </div>
 
-      <div style={{ marginTop: '1rem' }}>
-        <ClassSchedule classId={klass.classId} instructorMap={instructorMap} />
-      </div>
+      {activeTab === 'roster' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
+            <button type="button" style={styles.primaryBtn} onClick={() => setShowImport(true)}>
+              批次匯入
+            </button>
+          </div>
+          <div style={styles.grid}>
+            <article style={styles.card}>
+              <h2 style={styles.h2}>已加入學生（{activeRoster.length}）</h2>
+              {activeRoster.length === 0 && (
+                <p style={styles.placeholder}>還沒有學生加入此班級</p>
+              )}
+              <ul style={styles.list}>
+                {activeRoster.map((r) => {
+                  const s = studentById.get(r.studentId);
+                  return (
+                    <li key={r.id} style={styles.row}>
+                      <span>
+                        <Link to={`/students/${r.studentId}`}>{s?.name ?? r.studentId}</Link>
+                        <span style={styles.rowMeta}>
+                          <code>{r.studentId}</code>
+                          {s?.grade ? ` · ${s.grade}` : ''}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        style={styles.removeBtn}
+                        onClick={() => handleRemove(r.studentId)}
+                        disabled={busyId === r.studentId}
+                      >
+                        {busyId === r.studentId ? '處理中…' : '移除'}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </article>
 
-      {/* 就業統計 */}
-      <article style={{ ...styles.card, marginTop: '1rem' }}>
-        <h2 style={styles.h2}>就業統計</h2>
-        <EmploymentStatsSection courseId={klass.classId} />
-      </article>
+            <article style={styles.card}>
+              <h2 style={styles.h2}>可加入學生（全分校）</h2>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                <select
+                  value={candidateBranch}
+                  onChange={(e) => setCandidateBranch(e.target.value)}
+                  style={{ ...styles.search, margin: 0, flex: 1 }}
+                >
+                  <option value="">全部分校</option>
+                  {branches.map((b) => (
+                    <option key={b.branchId} value={b.branchId}>{b.name}</option>
+                  ))}
+                </select>
+                <input
+                  type="search"
+                  placeholder="搜尋姓名 / 學號"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  style={{ ...styles.search, margin: 0, flex: 2 }}
+                />
+              </div>
+              {candidates.length === 0 && (
+                <p style={styles.placeholder}>找不到符合條件的學生</p>
+              )}
+              <ul style={styles.list}>
+                {candidates.map((s) => {
+                  const sBranchName = branches.find((b) => b.branchId === s.branchId)?.name ?? s.branchId;
+                  return (
+                    <li key={s.studentId} style={styles.row}>
+                      <span>
+                        {s.name}
+                        <span style={styles.rowMeta}>
+                          <code>{s.studentId}</code>{s.grade ? ` · ${s.grade}` : ''}
+                          {' · '}{sBranchName}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        style={styles.addBtn}
+                        onClick={() => handleAdd(s)}
+                        disabled={busyId === s.studentId}
+                      >
+                        {busyId === s.studentId ? '處理中…' : '＋ 加入'}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </article>
+          </div>
+        </>
+      )}
+
+      {activeTab === 'analysis' && (
+        <div style={styles.card}>
+          <AnalysisTab roster={roster} allStudents={allStudents} />
+        </div>
+      )}
+
+      {activeTab === 'schedule' && (
+        <div style={{ marginTop: '1rem' }}>
+          <ClassSchedule classId={klass.classId} instructorMap={instructorMap} />
+        </div>
+      )}
+
+      {activeTab === 'employment' && (
+        <article style={{ ...styles.card, marginTop: '1rem' }}>
+          <h2 style={styles.h2}>就業統計</h2>
+          <EmploymentStatsSection courseId={klass.classId} />
+        </article>
+      )}
+
+      {klass && (
+        <StudentImportDialog
+          open={showImport}
+          branchId={klass.branchId}
+          classId={klass.classId}
+          className={klass.name}
+          onClose={() => setShowImport(false)}
+        />
+      )}
     </section>
   );
 }

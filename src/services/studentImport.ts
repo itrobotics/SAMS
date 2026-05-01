@@ -105,7 +105,7 @@ function parseCsv(file: File): Promise<ParseResult> {
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (result) => {
+      complete: (result: Papa.ParseResult<Record<string, string>>) => {
         resolve({ headers: result.meta.fields ?? [], rows: result.data });
       },
       error: (err: { message: string }) => reject(new Error(err.message)),
@@ -121,7 +121,7 @@ async function parseExcel(file: File): Promise<ParseResult> {
   const data = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: '' });
   if (data.length === 0) return { headers: [], rows: [] };
   // Ensure all values are strings
-  const rows = data.map((r) =>
+  const rows = data.map((r: Record<string, string>) =>
     Object.fromEntries(Object.entries(r).map(([k, v]) => [k, String(v)])),
   );
   return { headers: Object.keys(rows[0]), rows };

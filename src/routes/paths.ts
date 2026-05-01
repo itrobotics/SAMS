@@ -21,4 +21,5 @@ export const ROUTES = {
   settings: '/settings',
   options: '/options',
   surveyFill: (responseId = ':responseId') => `/survey/${responseId}`,
+  employmentTracking: '/employment-tracking',
 } as const;

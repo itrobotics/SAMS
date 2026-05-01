@@ -80,7 +80,6 @@ export interface StudentDoc {
   phone?: string;
   email?: string;
   idNumber?: string;
-  profileType?: 'child' | 'adult';
   education?: string;
   graduateSchool?: string;
   major?: string;
@@ -116,7 +115,6 @@ export interface NewStudentInput {
   phone?: string;
   email?: string;
   idNumber?: string;
-  profileType?: 'child' | 'adult';
   education?: string;
   graduateSchool?: string;
   major?: string;
@@ -153,7 +151,6 @@ export interface UpdateStudentInput {
   phone?: string;
   email?: string;
   idNumber?: string;
-  profileType?: 'child' | 'adult';
   education?: string;
   graduateSchool?: string;
   major?: string;

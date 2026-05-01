@@ -16,6 +16,7 @@ import { useBranches } from '../hooks/useBranches';
 import { db } from '../services/firebase';
 import { subscribeStudentClasses } from '../services/classStudents';
 import { subscribeLeaveRequestsForStudent } from '../services/leaveRequests';
+import { fetchStudentSurveyHistory } from '../services/surveys';
 import { canAccessBranch } from '../types/user';
 import {
   PROFILE_TYPE_LABELS,
@@ -30,6 +31,7 @@ import {
   LEAVE_STATUS_LABELS,
   type LeaveRequestDoc,
 } from '../types/leaveRequest';
+import type { SurveyResponseDoc } from '../types/survey';
 
 type Tab = 'profile' | 'employment';
 
@@ -42,6 +44,8 @@ export function StudentDetailPage() {
   const [editing, setEditing] = useState(false);
   const [enrollments, setEnrollments] = useState<ClassStudentDoc[]>([]);
   const [leaves, setLeaves] = useState<LeaveRequestDoc[]>([]);
+  const [surveyHistory, setSurveyHistory] = useState<SurveyResponseDoc[] | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>('profile');
 
   useEffect(() => {
     if (!studentId) return;
@@ -67,6 +71,11 @@ export function StudentDetailPage() {
     if (!studentId) return;
     const unsub = subscribeLeaveRequestsForStudent(studentId, setLeaves);
     return unsub;
+  }, [studentId]);
+
+  useEffect(() => {
+    if (!studentId) return;
+    fetchStudentSurveyHistory(studentId).then(setSurveyHistory);
   }, [studentId]);
 
   if (loading) return <div style={{ color: '#6b7280' }}>載入中…</div>;
@@ -120,7 +129,25 @@ export function StudentDetailPage() {
         </button>
       </header>
 
-      <div style={styles.grid}>
+      {/* Tab 導覽 */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid #e5e7eb' }}>
+        <button
+          type="button"
+          style={activeTab === 'profile' ? styles.tabActive : styles.tab}
+          onClick={() => setActiveTab('profile')}
+        >
+          基本資料
+        </button>
+        <button
+          type="button"
+          style={activeTab === 'employment' ? styles.tabActive : styles.tab}
+          onClick={() => setActiveTab('employment')}
+        >
+          就業追蹤
+        </button>
+      </div>
+
+      {activeTab === 'profile' && <div style={styles.grid}>
         {/* 卡片 1：基本資料（共用） */}
         <article style={styles.card}>
           <h2 style={styles.h2}>
@@ -302,57 +329,7 @@ export function StudentDetailPage() {
           <h2 style={styles.h2}>人臉照片狀態</h2>
           <StudentFacePhotos student={student} />
         </article>
-      </div>
-
-      {/* Tab: 基本資料 */}
-      {activeTab === 'profile' && (
-        <div style={styles.grid}>
-          <article style={styles.card}>
-            <h2 style={styles.h2}>基本資料</h2>
-            <dl style={styles.dl}>
-              <DT label="姓名">{student.name}</DT>
-              <DT label="學號"><code>{student.studentId}</code></DT>
-              <DT label="年級">{student.grade || '—'}</DT>
-              <DT label="分校">{branchName}（<code>{student.branchId}</code>）</DT>
-              <DT label="家長姓名">{student.parentName || '—'}</DT>
-              <DT label="家長電話">{student.parentPhone || '—'}</DT>
-              <DT label="狀態">{student.active ? '啟用' : '停用'}</DT>
-            </dl>
-          </article>
-
-          <article style={styles.card}>
-            <h2 style={styles.h2}>所屬班級</h2>
-            {enrollments.length === 0 ? (
-              <p style={styles.placeholder}>尚未加入任何班級</p>
-            ) : (
-              <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
-                {enrollments.map((e) => (
-                  <li key={e.id} style={{ marginBottom: '0.25rem' }}>
-                    <code>{e.classId}</code>
-                    {!e.active && (
-                      <span style={{ color: '#9ca3af', fontSize: '0.8rem', marginLeft: '0.4rem' }}>
-                        （已退出）
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </article>
-
-          <article style={styles.card}>
-            <h2 style={styles.h2}>最近出席紀錄</h2>
-            <p style={styles.placeholder}>
-              出席紀錄（attendance_records）將於 Phase 5 / Task 021 後顯示。
-            </p>
-          </article>
-
-          <article style={styles.card}>
-            <h2 style={styles.h2}>人臉照片狀態</h2>
-            <StudentFacePhotos student={student} />
-          </article>
-        </div>
-      )}
+      </div>}
 
       {/* Tab: 就業追蹤 */}
       {activeTab === 'employment' && (

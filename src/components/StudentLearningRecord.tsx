@@ -141,7 +141,7 @@ export function StudentLearningRecord({ studentId }: Props) {
                       <td style={styles.td}>{dateLabel}</td>
                       <td style={styles.td}>{lv.reason || '—'}</td>
                       <td style={{ ...styles.td, textAlign: 'center' }}>
-                        <span style={{ ...styles.pill, background: colors.bg, color: colors.text }}>
+                        <span style={{ ...styles.pill, background: colors.bg, color: colors.fg }}>
                           {LEAVE_STATUS_LABELS[lv.status]}
                         </span>
                       </td>

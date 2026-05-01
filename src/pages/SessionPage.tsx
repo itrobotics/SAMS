@@ -52,6 +52,9 @@ export function SessionPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [settings, setSettings] = useState<BranchSettings | null>(null);
   const [leaveTarget, setLeaveTarget] = useState<AttendanceRecordDoc | null>(null);
+  const [surveyResponses, setSurveyResponses] = useState<SurveyResponseDoc[]>([]);
+  const [surveySending, setSurveySending] = useState(false);
+  const [showSurveyStats, setShowSurveyStats] = useState(false);
 
   // 訂閱該分校設定（取 graceMinutes）
   useEffect(() => {
@@ -126,6 +129,32 @@ export function SessionPage() {
       window.alert(e instanceof Error ? e.message : '請假登錄失敗');
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function handleSendSurvey() {
+    if (!sessionId || !session) return;
+    const presentRecords = records.filter(
+      (r) => r.status === 'CHECKED_IN' || r.status === 'LATE',
+    );
+    if (presentRecords.length === 0) {
+      window.alert('尚無出席學員，無法發送問卷。');
+      return;
+    }
+    setSurveySending(true);
+    try {
+      const count = await sendSurveyForSession(
+        sessionId,
+        session.classId,
+        session.branchId,
+        presentRecords,
+      );
+      window.alert(count > 0 ? `已為 ${count} 位學員建立問卷。` : '問卷已全部建立（無新增）。');
+      setShowSurveyStats(true);
+    } catch {
+      window.alert('發送問卷失敗，請稍後再試。');
+    } finally {
+      setSurveySending(false);
     }
   }
 

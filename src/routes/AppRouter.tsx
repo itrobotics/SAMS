@@ -172,6 +172,15 @@ export function AppRouter() {
         {/* 問卷填寫頁：無需登入 */}
         <Route path={ROUTES.surveyFill()} element={<SurveyFillPage />} />
 
+        <Route
+          path={ROUTES.employmentTracking}
+          element={
+            <AuthGuard>
+              <EmploymentTrackingPage />
+            </AuthGuard>
+          }
+        />
+
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
