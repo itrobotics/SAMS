@@ -91,6 +91,29 @@ export async function setSessionStatus(sessionId: string, status: SessionStatus)
   await updateDoc(sessionRef(sessionId), { status });
 }
 
+export function subscribeSessionsForClass(
+  classId: string,
+  onChange: (sessions: SessionDoc[]) => void,
+  onError?: (e: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(db, SESSIONS_COLLECTION),
+    where('classId', '==', classId),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      const sessions = snap.docs.map(snapshotToSession);
+      sessions.sort((a, b) => {
+        const d = a.date.localeCompare(b.date);
+        return d !== 0 ? d : a.startTime.localeCompare(b.startTime);
+      });
+      onChange(sessions);
+    },
+    (err) => onError?.(err),
+  );
+}
+
 export async function deleteSessionWithRecords(sessionId: string): Promise<void> {
   const recordsSnap = await getDocs(
     query(collection(db, ATTENDANCE_RECORDS_COLLECTION), where('sessionId', '==', sessionId)),
