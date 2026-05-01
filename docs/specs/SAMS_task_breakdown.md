@@ -3,6 +3,73 @@
 
 ---
 
+## 開發狀態總覽（最後更新：2026-05-01）
+
+### ✅ 已完成（Tasks 001 – 066）
+
+| Phase | 名稱 | 狀態 | 涵蓋 Task |
+|---|---|---|---|
+| Phase 0 | 專案初始化 | ✅ | 001 – 004 |
+| Phase 1 | 登入與權限 | ✅ | 005 – 007 |
+| Phase 2 | 多分校基礎資料 | ✅ | 008 – 010 |
+| Phase 3 | 學生資料管理 | ✅ | 011 – 014 |
+| Phase 4 | 班級與排課 | ✅ | 015 – 019 |
+| Phase 5 | 每日場次產生 | ✅ | 020 – 023 |
+| Phase 6 | 班級報到系統 MVP | ✅ | 024 – 028 |
+| Phase 7 | Kiosk 自助報到畫面 | ✅ | 029 – 031 |
+| Phase 8 | 人臉照片註冊模組 | ✅ | 032 – 035 |
+| Phase 9 | 人臉報到模組 | ✅ | 036 – 041 |
+| Phase 10 | HQ Dashboard | ✅ | 042 – 044 |
+| Mid-dev | 進階功能擴充（見下方 §M1） | ✅ | 045 – 066 |
+
+### 🚧 待開發
+
+| Phase | 名稱 | 預計 Task |
+|---|---|---|
+| Phase 11 | 請假模組（細節重新規劃） | 067 – 071 |
+| Phase 12 | 通知模組 | 072 – 074 |
+| Phase 13 | 報表分析 | 075 – 077 |
+| Phase 14 | 系統設定（剩餘） | 078 – 079 |
+| Phase 15 | 測試與上線 | 080 – 083 |
+| Phase 16 | 班級定價模組（新） | 084 – 088 |
+| Phase 17 | 課程方案模組（新） | 089 – 098 |
+| Phase 18 | 學員 Profile 類型 child / adult（新） | 099 – 103 |
+
+> 完整規格請參考 `SAMS_spec_v_1_0.md` 與 `SAMS_engineering_spec.md`。
+
+---
+
+## §M1 Mid-development 進階功能擴充（Tasks 045 – 066，已完成）
+
+原始 spec 的 Phase 11–15 task 編號被重新分配給 2026-04 之後追加的需求（講師管理、選項管理、台灣地址、各表單擴充欄位、定價設計、設定頁等）。實際完成內容：
+
+| Task | 主題 |
+|---|---|
+| 045 | app_options collection、OptionsPage、選項管理 |
+| 046 | 講師管理 CRUD（instructors） |
+| 047 | 學員 / 班級 / 講師編號自動遞增 |
+| 048 | 班級清單顯示班級學生人數 |
+| 049 | 班級允許跨分校加入學生 |
+| 050 | 講師：性別、縣市/地址拆分、鐘點費、累計教學時數、備註 |
+| 051 | 學生：在編輯表單支援永久刪除（Alert 確認） |
+| 052 | app_options 新增 `courseTypes`（micro:bit、Scratch、Python…） |
+| 053 | 班級：講師欄位改 dropdown、新增 courseType dropdown |
+| 054 | 台灣縣市 / 鄉鎮資料、`TaiwanAddressFields` 元件 |
+| 055 | 班級清單講師顯示 `T001-Joseph` 格式 |
+| 056 | 學生：性別、生日、完整地址、緊急聯絡人、備註 |
+| 057 | 講師：生日、行政區、套用 TaiwanAddressFields |
+| 058 | 班級：courseStartDate / courseEndDate / courseHours、create 模式可改 active |
+| 059 | 班級時段格式 `週二 18:00–18:30（講師 T003 matt｜教室 101）` |
+| 060 | 班級清單「上課講師」、列出全部講師、期間 filter、姓名搜尋 |
+| 061 | 講師排課頁 `/instructors/:id/schedule`、period / status filter |
+| 062 | 全系統 UI「老師」→「講師」 |
+| 063 | 分校：servicePhone、director 系列、notes |
+| 064 | 分校列表顯示 servicePhone、directorName |
+| 065 | 分校 Dashboard 場次刪除（含 attendance_records 連動） |
+| 066 | 設定頁：graceMinutes 編輯（依分校） |
+
+---
+
 ## 0. 開發策略
 
 本系統建議採用 **先做可運作 MVP，再逐步加上人臉辨識、通知、報表與管理分析** 的方式開發。
@@ -22,7 +89,7 @@
 
 ---
 
-# Phase 0｜專案初始化
+# Phase 0｜專案初始化 ✅
 
 ## 目標
 
@@ -89,7 +156,7 @@
 
 ---
 
-# Phase 1｜登入與權限
+# Phase 1｜登入與權限 ✅
 
 ## 目標
 
@@ -144,7 +211,7 @@ Firestore collection：`users`
 
 ---
 
-# Phase 2｜多分校基礎資料
+# Phase 2｜多分校基礎資料 ✅
 
 ## 目標
 
@@ -188,7 +255,7 @@ Firestore collection：`users`
 
 ---
 
-# Phase 3｜學生資料管理
+# Phase 3｜學生資料管理 ✅
 
 ## 目標
 
@@ -250,7 +317,7 @@ Firestore collection：`users`
 
 ---
 
-# Phase 4｜班級與排課
+# Phase 4｜班級與排課 ✅
 
 ## 目標
 
@@ -328,7 +395,7 @@ Firestore collection：`users`
 
 ---
 
-# Phase 5｜每日場次產生
+# Phase 5｜每日場次產生 ✅
 
 ## 目標
 
@@ -396,7 +463,7 @@ Firestore collection：`users`
 
 ---
 
-# Phase 6｜班級報到系統 MVP
+# Phase 6｜班級報到系統 MVP ✅
 
 ## 目標
 
@@ -460,7 +527,7 @@ Firestore collection：`users`
 
 ---
 
-# Phase 7｜Kiosk 自助報到畫面
+# Phase 7｜Kiosk 自助報到畫面 ✅
 
 ## 目標
 
@@ -503,7 +570,7 @@ Firestore collection：`users`
 
 ---
 
-# Phase 8｜人臉照片註冊模組
+# Phase 8｜人臉照片註冊模組 ✅
 
 ## 目標
 
@@ -569,7 +636,7 @@ POST /api/face/register
 
 ---
 
-# Phase 9｜人臉報到模組
+# Phase 9｜人臉報到模組 ✅
 
 ## 目標
 
@@ -676,7 +743,7 @@ active face_profiles
 
 ---
 
-# Phase 10｜HQ Dashboard
+# Phase 10｜HQ Dashboard ✅
 
 ## 目標
 
@@ -715,55 +782,77 @@ active face_profiles
 
 ---
 
-# Phase 11｜請假模組
+# Phase 11｜請假模組 🚧（已完整重新規劃）
 
 ## 目標
 
-支援學生請假狀態。
+支援學員 / 行政請假流程，與 attendance_records 連動，並保留審核軌跡。
+
+> 註：原始 spec 的 Task 045–047 編號已被 §M1 中段功能擴充使用。Phase 11 重新編號為 Task 067–071。
 
 ---
 
-### Task 045｜建立 leave_requests collection
+### Task 067｜建立 leave_requests collection 與服務 API
 
 ```ts
 {
   leaveId: string,
   studentId: string,
+  studentName: string,
   branchId: string,
   sessionId: string,
+  classId: string,
+  className: string,
+  sessionDate: string,
   reason: string,
-  status: 'pending' | 'approved' | 'rejected',
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled',
+  createdBy: string,
   createdAt: timestamp,
-  approvedBy: string | null
+  approvedBy: string | null,
+  approvedAt: timestamp | null,
+  rejectedReason: string | null,
 }
 ```
 
----
+服務 API（`src/services/leaves.ts`）：`createLeaveRequest`、`approveLeaveRequest`、`rejectLeaveRequest`、`cancelLeaveRequest`、`listLeavesByStudent`、`listLeavesBySession`、`listPendingLeaves`。
 
-### Task 046｜建立行政請假登錄頁
-
-功能：
-
-- 選學生
-- 選場次
-- 填原因
-- 送出後 attendance_records 改為 LEAVE
+同步更新 `firestore.rules` 與 indexes。
 
 ---
 
-### Task 047｜建立請假列表
+### Task 068｜SessionPage 加入「請假」按鈕與表單
 
-顯示：
-
-- 日期
-- 學生
-- 班級
-- 原因
-- 狀態
+- 每位學生列「操作」欄新增請假按鈕
+- 彈出表單：原因
+- branch_admin / hq_admin 直接 approve；teacher / staff 預設 pending
+- approve 時 atomic 寫入：建立 leave_requests + 更新該 attendance_records.status = 'LEAVE'、寫入 attendance_records.leaveId
 
 ---
 
-# Phase 12｜通知模組
+### Task 069｜StudentDetailPage 請假紀錄分頁
+
+- 新增「請假紀錄」Tab
+- 列出該學員所有 leave_requests（日期、班級、原因、狀態、審核人）
+- 提供 cancel 按鈕（pending 或場次未開始才允許）
+
+---
+
+### Task 070｜LeavesPage（總覽）
+
+- 新增 `/leaves` 路由
+- Filter：分校、學生、日期區間、狀態
+- 列表顯示所有請假，支援 approve / reject pending 項目（依角色）
+
+---
+
+### Task 071｜attendance LEAVE 狀態防呆
+
+- Firestore rules 限制：attendance_records 改為 `LEAVE` 必須由服務層的 batch（含 leaveId）寫入，不允許 client 直接寫狀態
+- 對應 cancel 流程：若 leave 從 approved 改為 cancelled，且 session 尚未開始，將 attendance_records 由 `LEAVE` 還原為 `SCHEDULED`
+
+---
+
+# Phase 12｜通知模組 🚧
 
 ## 目標
 
@@ -771,7 +860,7 @@ active face_profiles
 
 ---
 
-### Task 048｜建立通知事件規則
+### Task 072｜建立通知事件規則
 
 事件：
 
@@ -782,7 +871,7 @@ active face_profiles
 
 ---
 
-### Task 049｜建立通知紀錄 collection
+### Task 073｜建立通知紀錄 collection
 
 ```ts
 {
@@ -797,7 +886,7 @@ active face_profiles
 
 ---
 
-### Task 050｜串接 LINE Messaging API
+### Task 074｜串接 LINE Messaging API
 
 功能：
 
@@ -806,7 +895,7 @@ active face_profiles
 
 ---
 
-# Phase 13｜報表分析
+# Phase 13｜報表分析 🚧
 
 ## 目標
 
@@ -814,7 +903,7 @@ active face_profiles
 
 ---
 
-### Task 051｜建立出席率報表
+### Task 075｜建立出席率報表
 
 維度：
 
@@ -825,7 +914,7 @@ active face_profiles
 
 ---
 
-### Task 052｜建立人臉辨識品質報表
+### Task 076｜建立人臉辨識品質報表
 
 指標：
 
@@ -836,7 +925,7 @@ active face_profiles
 
 ---
 
-### Task 053｜建立缺席風險名單
+### Task 077｜建立缺席風險名單
 
 規則：
 
@@ -846,41 +935,38 @@ active face_profiles
 
 ---
 
-# Phase 14｜系統設定
+# Phase 14｜系統設定 🚧（部分 ✅）
 
-## 目標
-
-讓管理者調整規則。
+> graceMinutes 編輯已於 Task 066 完成。其餘設定為待開發。
 
 ---
 
-### Task 054｜建立 settings collection
+### Task 078｜settings collection 補齊欄位
 
 ```ts
 {
   branchId: string,
-  graceMinutes: number,
-  faceAutoPassThreshold: number,
-  faceConfirmThreshold: number,
-  checkinOpenBeforeMinutes: number,
-  checkinCloseAfterMinutes: number
+  graceMinutes: number,                         // ✅ Task 066
+  faceAutoPassThreshold: number,                // 🚧
+  faceConfirmThreshold: number,                 // 🚧
+  checkinOpenBeforeMinutes: number,             // 🚧
+  checkinCloseAfterMinutes: number              // 🚧
 }
 ```
 
 ---
 
-### Task 055｜建立設定頁
+### Task 079｜設定頁補齊 UI
 
 可設定：
 
-- 遲到寬限分鐘
 - 人臉自動通過門檻
 - 人工確認門檻
 - 報到開放時間
 
 ---
 
-# Phase 15｜測試與上線
+# Phase 15｜測試與上線 🚧
 
 ## 目標
 
@@ -888,7 +974,7 @@ active face_profiles
 
 ---
 
-### Task 056｜建立測試資料
+### Task 080｜建立測試資料
 
 建立：
 
@@ -899,7 +985,7 @@ active face_profiles
 
 ---
 
-### Task 057｜建立測試案例
+### Task 081｜建立測試案例
 
 測試情境：
 
@@ -912,7 +998,7 @@ active face_profiles
 
 ---
 
-### Task 058｜分校現場試跑
+### Task 082｜分校現場試跑
 
 試跑場域：
 
@@ -930,7 +1016,7 @@ active face_profiles
 
 ---
 
-### Task 059｜MVP 上線檢查表
+### Task 083｜MVP 上線檢查表
 
 - 登入正常
 - 權限正常
@@ -943,466 +1029,233 @@ active face_profiles
 
 ---
 
-# Phase 16｜MVP 後續優化
+# Phase 16｜班級定價模組 🚧
 
 ## 目標
 
-MVP 主流程上線後逐步加入的營運與管理輔助功能。涵蓋共用基礎（自動代碼、選項管理、台灣地址）、主檔資料擴充（講師 / 學生 / 分校 / 班級）、進階模組（定價表、講師排課清單、期間 filter 統一）。
+為每個班級維護定價與計費方式，支援預估營收計算。
 
-開發順序與 commit 上的 Task 編號一致（Task 045 ~ Task 066）。本 phase 與排課 / 報到主流程獨立，可分階段交付。
+---
 
-> 本 phase 期間另有數筆未編號的修補 commit（如「strip undefined meeting fields」、「add Firestore rules for instructors and app_options」、「support multiple meetings per class with per-meeting overrides」），不另列為 Task。
-
-## Tasks
-
-### Task 045｜建立 app_options collection 與選項管理頁
-
-新增 `app_options` collection 作為共用下拉選單來源；每個 doc 代表一類選項。
+### Task 084｜建立 class_pricing collection 與服務 API
 
 ```ts
 {
-  key: string,            // doc ID（如 'courses'）
-  label: string,
-  values: string[],
-  updatedAt: timestamp
-}
-```
-
-預設 doc：
-
-- `courses` — 講師可教授課程
-- `relationships` — 緊急聯絡人關係
-
-新頁面 `/options`（HQ Admin 限定），可新增 / 刪除 / 排序選項。
-
----
-
-### Task 046｜建立講師管理 CRUD
-
-新增 `instructors` collection 與 `/instructors` 頁面。欄位：基本資料 / 學歷 / 聯絡方式 / 緊急聯絡人 / 鐘點 / 累計教學時數。
-
-`instructorId` 採 `Tnnn` 流水號自動產生（透過 Task 047 的 helper）。
-
----
-
-### Task 047｜自動產生主檔代碼
-
-新增 `src/utils/autoId.ts`：掃 collection 找最大 `${prefix}\d+` 後 +1，補零至 3 位。
-
-`studentId` / `classId` / `instructorId` 新增時自動帶入；使用者仍可改。
-
----
-
-### Task 048｜班級列表顯示學生人數
-
-新增 `fetchAllActiveClassStudentCounts(): Promise<Map<string, number>>`，aggregate `class_students` 啟用人數。
-
-ClassesPage 一次性 fetch（非訂閱）並在每列顯示「學生人數」。
-
----
-
-### Task 049｜支援跨分校加入學生
-
-班級學生管理頁加分校 filter（HQ 預設「全部分校」），移除原本「只能加同分校學生」的限制。`class_students.branchId` 仍寫入，方便日後 server-side 隔離。
-
----
-
-### Task 050｜講師擴充欄位
-
-加入：性別、通訊地址（縣市 / 區 / 詳址分離）、戶籍地址（含「同通訊」勾選）、鐘點 `hourlyRate`、累計教學時數 `totalTeachingHours`、備註。
-
----
-
-### Task 051｜學生編輯支援永久刪除
-
-`StudentFormDialog` 加紅色「刪除」按鈕（雙確認）；同時清掉該學生的 `class_students` 關聯。
-
----
-
-### Task 052｜app_options 加 courseTypes
-
-`app_options` 新增 `courseTypes` doc，預設 19 種課程類型（micro:bit / 科學實驗 / MPM / Scratch …）。`OPTION_LABELS.courseTypes = '課程類型（班級）'`。
-
----
-
-### Task 053｜班級表單改用講師下拉與課程類型下拉
-
-`ClassFormDialog` 移除 `teacherId` 文字輸入，改 `subscribeInstructors({ activeOnly: true })` 下拉；課程類型也改下拉（讀 `app_options.courseTypes`）。
-
----
-
-### Task 054｜台灣縣市行政區資料與 TaiwanAddressFields component
-
-- 新增 `src/utils/taiwanAddress.ts` — 縣市 → 區陣列查表
-- 新增 `src/components/TaiwanAddressFields.tsx` — 共用元件，給 student / instructor 表單用
-
----
-
-### Task 055｜班級列表顯示「T001-Joseph」格式
-
-ClassesPage 用 instructor map 顯示「ID-姓名」，未指定講師則「—」。
-
----
-
-### Task 056｜學生擴充欄位
-
-加入：性別、生日、通訊地址（縣市 / 區 / 詳址）、戶籍地址（含「同通訊」勾選）、緊急聯絡人（姓名 + 關係）、備註。改用 `<TaiwanAddressFields>`。
-
----
-
-### Task 057｜講師加生日 + 行政區欄位
-
-instructors 加 `birthday`；地址改用 `<TaiwanAddressFields>`（縣市 / 區 / 詳址三段）。
-
----
-
-### Task 058｜班級加課程起訖日 / 時數 / 新增模式啟用 toggle
-
-`ClassDoc` 加：
-
-- `courseStartDate: 'YYYY-MM-DD'`
-- `courseEndDate: 'YYYY-MM-DD'`
-- `courseHours: number`
-
-`ClassFormDialog` 新增模式也顯示「啟用」checkbox（先前只有編輯模式）。
-
----
-
-### Task 059｜班級時段顯示優化
-
-班級列表 meeting 顯示為「週二 18:00–18:30（講師 T003 matt | 教室 101）」。即時 join `instructors` 與 meeting override，可一眼看出每個時段的負責講師與教室。
-
-> 註：早期 task breakdown 把 Task 059 標為「MVP 上線檢查表」（見上），實際開發時 Task 059 編號被用在這個 UI 改動。檢查表項目仍適用於 MVP 上線，但未做為單一 commit。
-
----
-
-### Task 060｜班級欄位改名與多重 filter
-
-- 「老師」→「上課講師」（單一班級可多講師）
-- ClassesPage 加：期間 filter / 講師代碼或姓名搜尋
-- `formatTeachers()` 列出該班所有講師（預設 `teacherId` + 各 meeting `teacherId` override，去重）
-
----
-
-### Task 061｜講師排課清單頁
-
-新頁面 `/instructor-schedule`：列出某講師被排在哪些班級的哪些時段（預設 + meeting override）。篩選：講師 / 期間 / 啟用狀態。
-
----
-
-### Task 062｜全 UI 將「老師」改為「講師」
-
-全域 string replace（UI label / 註解 / hint），底層欄位名 `teacherId` 不動以維持 schema 穩定。
-
----
-
-### Task 063｜分校加客服電話、主任資訊、備註欄位
-
-`branches` 加：
-
-```ts
-{
-  servicePhone: string,    // 客服電話
-  directorName: string,    // 主任姓名
-  directorPhone: string,   // 主任手機
-  directorLineId: string,  // 主任 Line ID
-  notes: string            // 備註
-}
-```
-
----
-
-### Task 064｜分校列表顯示 servicePhone 與 directorName
-
-BranchesPage 新增兩欄，方便分校頁一眼看出聯絡資訊。
-
----
-
-### Task 065｜建立班級定價表模組
-
-對應產品 spec **M13 班級定價表模組**。
-
-新增檔案：
-
-- `src/types/classPricing.ts` — `ClassPricingDoc` 型別、`PriceType` 列舉
-- `src/services/classPricing.ts` — Firestore CRUD + `subscribeClassPricing({ branchIds, classId?, activeOnly? })`，內建 6 位 `PRnnnnnn` 流水號產生器
-- `src/components/ClassPricingFormDialog.tsx` — 新增 / 編輯表單
-- `src/pages/ClassPricingPage.tsx` — 列表 + 篩選 + 預估營收
-
-修改檔案：
-
-- `src/routes/paths.ts` — 加入 `classPricing: '/class-pricing'`
-- `src/routes/AppRouter.tsx` — 註冊路由
-- `src/components/AppLayout.tsx` — 導覽列加「定價表」（HQ Admin / Branch Admin 可見）
-- `firestore.rules` — 加入 `class_pricing` collection 規則（沿用「登入即可讀寫」）
-
-#### Firestore：`class_pricing`
-
-```ts
-{
-  pricingId: string,                                       // 自動產生 PRnnnnnn
+  pricingId: string,
   classId: string,
   branchId: string,
-  className: string,                                        // denormalized
-  price: number,                                            // TWD，每人費用
-  priceType: 'per_class' | 'per_month' | 'per_session',
-  notes: string,
-  active: boolean,
+  price: number,
+  priceType: 'per_month' | 'per_session' | 'per_class',
+  currency: 'TWD',
+  effectiveFrom: string,
+  effectiveTo: string | null,
+  notes?: string,
+  createdBy: string,
   createdAt: timestamp,
-  createdBy: string
+  updatedAt: timestamp,
 }
 ```
 
-#### 計費方式
-
-- **per_class — 每班次**：整個班次（一期）一筆費用
-- **per_month — 每月**：每人每月收費
-- **per_session — 每堂**：每人每堂收費
-
-#### 列表欄位
-
-| 班級名稱 | 分校 | 定價/人 | 計費方式 | 目前人數 | 預估營收 | 狀態 | 操作 |
-
-- 預估營收 = `price × class_students.active 人數`（client 端計算）
-- header 顯示「啟用中預估營收合計 NT$ ...」
-
-#### 篩選
-
-- 分校（角色過濾後）
-- 班級名稱（client 端 substring）
-- 啟用狀態：啟用中（預設）/ 已停用 / 全部
-
-#### 設計決策
-
-- 同一 classId 可有多筆定價（例如優惠價、舊價、不同方案）；不以「生效期間」區分，改以 `active` 控制是否納入估算
-- `className` denormalized，列表免再 join classes
-- `pricingId` 用 6 位流水號（`autoId.ts` 只支援 3 位，service 內建獨立生成器）
+服務 API：`createClassPricing`、`updateClassPricing`、`getActivePricing(classId, asOf?)`、`listPricingByBranch`。
+同步更新 firestore.rules / indexes。
 
 ---
 
-### Task 066｜統一班級期間 Filter
+### Task 085｜營收計算 utility
 
-#### 動機
+`calcMonthlyRevenue(classId)`：
 
-ClassesPage 與 InstructorSchedulePage 原本各自實作「今日 / 本週 / 本月 / 上月 / 下月 / 自訂期間」加上自訂日期區間 UI；經實際使用後改為 6 個固定 preset，邏輯改成「指定欄位的月 / 季是否落在某個月 / 季」。
-
-#### 期間選項（兩頁共用）
-
-| 選項 | 規則 |
-|---|---|
-| 全部（預設） | 不過濾 |
-| 本月開課 | 月(`courseStartDate`) === 本月 |
-| 本月結束 | 月(`courseEndDate`) === 本月 |
-| 上月開課 | 月(`courseStartDate`) === 上月 |
-| 下月結束 | 月(`courseEndDate`) === 下月 |
-| 本季開課 | 季(`courseStartDate`) === 本季 |
-| 本季結束 | 季(`courseEndDate`) === 本季 |
-
-> 季：1-3 月 = Q1，4-6 月 = Q2，7-9 月 = Q3，10-12 月 = Q4。
-> 未填對應日期的班級在非「全部」preset 下會被排除。
-
-#### 新增 / 修改檔案
-
-- 新增 `src/utils/coursePeriodFilter.ts` — `CoursePeriodPreset` 型別、`COURSE_PERIOD_OPTIONS` 陣列、`matchesCoursePeriod(preset, courseStartDate, courseEndDate, now?)`
-- 修改 `src/pages/ClassesPage.tsx` 與 `src/pages/InstructorSchedulePage.tsx`：移除舊 `getPresetRange` / `overlapsPeriod` / 自訂日期區間 UI，改用共用 util
-
----
-
-# Phase 17｜課程方案模組（CRS / MOD / CS）
-
-> 與「班級（Classes）」並列的第二種授課型態：有總時數目標、固定一批學員、不一定固定週期的長期課程。
-
-## Tasks
-
-### Task 067｜課程方案核心架構
-
-#### 三層資料模型
-
-| 層次 | Collection | ID 前綴 | 說明 |
-|---|---|---|---|
-| 課程方案 | `courses` | `CRS00001` | 最上層，含總規劃時數、狀態 |
-| 課程單元 | `course_modules` | `MOD00001` | 屬於某 course，含排課 slots 陣列 |
-| 課程場次 | `course_sessions` | `CS000001` | 從 slot「開啟報到」後產生，才可打卡 |
-
-#### 額外 Collections
-
-- `course_enrollments` — `CRS00001__STU001`，記錄哪個學生報名哪個 course
-- `course_attendance` — 課程場次出席紀錄，狀態同班級（SCHEDULED / CHECKED_IN / LATE / ABSENT…）
-
-#### 頁面
-
-- `CoursesPage`（`/courses`）— 課程方案列表，含新增/編輯/停用
-- `CourseDetailPage`（`/courses/:courseId`）— 課程方案詳情，含：
-  - 基本資料（名稱、分校、總規劃時數、狀態）
-  - 課程單元管理（新增/編輯 MOD，slots 陣列排課）
-  - 學員管理（加入/移除學員，enrollment 狀態）
-  - 每個單元可對指定 slot「開啟報到」→ 建立 CourseSession（CS）
-
-#### 規則
-
-- CourseSession 僅在「開啟報到」時手動建立，不自動產生
-- 出席預設 SCHEDULED，流程同班級場次
-- 實際時數由已完成（`status: completed`）的 CourseSession 累加
-
-#### 新增 / 修改檔案
-
-- `src/types/course.ts`、`src/types/courseModule.ts`、`src/types/courseSession.ts`
-- `src/types/courseEnrollment.ts`、`src/types/courseAttendance.ts`
-- `src/services/courses.ts`、`src/services/courseModules.ts`、`src/services/courseSessions.ts`
-- `src/services/courseEnrollments.ts`、`src/services/courseAttendance.ts`
-- `src/pages/CoursesPage.tsx`、`src/pages/CourseDetailPage.tsx`
-- `src/pages/CourseSessionPage.tsx` — 課程場次出席管理（同 SessionPage）
-- `src/components/CourseFormDialog.tsx`、`src/components/AppLayout.tsx`（新增「課程方案」nav）
-- `firestore.rules` — 補 courses / course_modules / course_sessions / course_enrollments / course_attendance 規則
-
----
-
-### Task 068｜課程方案場次整合 Dashboard + Kiosk
-
-#### 功能
-
-- **分校 Dashboard**：今日課程方案場次（`branchId + date` 查詢）+ 應到/已到統計，與班級場次並列
-- **HQ Dashboard**：今日跨分校課程方案場次統計合入總表
-- **Kiosk Session Selector**：課程方案場次納入勾選清單，與班級場次並列
-  - session key 前綴區分：`class:${sessionId}` / `course:${courseSessionId}`
-  - 預設自動勾選「進行中或即將開始」場次
-- **Kiosk 打卡邏輯**：
-  - 比對範圍同時包含班級 + 課程方案的應到名單
-  - 命中後同時更新 `attendance`（班級）+ `course_attendance`（課程方案）
-
-#### 新增 / 修改檔案
-
-- `src/hooks/useRealtime.ts` — 新增 `useBranchDayCourseSessionsRealtime`、`useBranchDayCourseAttendanceRealtime`
-- `src/pages/BranchDashboardPage.tsx`、`src/pages/HQDashboardPage.tsx`
-- `src/components/KioskSessionSelector.tsx`
-- `src/hooks/useKioskCheckin.ts`、`src/pages/KioskPage.tsx`
-
----
-
-### Task 069｜課程方案名稱顯示優化
-
-**問題**：KioskSessionSelector 的 CourseRow 及 CourseSessionPage 原本只顯示 ID（CRS00001 / MOD00001 / T001），操作者需要背誦代碼。
-
-**改動**：
-- `KioskSessionSelector.tsx` CourseRow：訂閱 `courses` + `course_modules` + `instructors`，顯示三行人類可讀資訊：
-  - 課程名稱 [CRS00001]
-  - 單元名稱 [MOD00001]
-  - 時間 · 教室 · 講師姓名
-- `CourseSessionPage.tsx` header：重構為三行結構（課程名 + 單元名 + 場次詳情）
-
----
-
-### Task 070｜課程方案詳情頁排課清單
-
-在 `CourseDetailPage` 的「課程單元」與「學員名單」之間加入「排課清單」區塊。
-
-#### 顯示格式
-
-- 三種檢視 Toggle：**按日期** / **按單元** / **按講師**
-- 每列顯示：日期（含星期）、時間、時數、單元名、講師、教室、是否已開報到（有 CourseSession）
-- 中文星期：`weekdayZh()` util
-
-#### 新增 / 修改檔案
-
-- `src/pages/CourseDetailPage.tsx` — 新增 `CourseScheduleCard` component、`ScheduleRow` interface、`weekdayZh()` util
-
----
-
-# Phase 18｜Kiosk UI 改版
-
-## Tasks
-
-### Task 071｜Kiosk 左右分割佈局 + 手動辨識模式
-
-#### 版面
-
-```
-┌────────────── 38% ──────────────┬──────────────── 62% ───────────────┐
-│  [手動辨識] [自動辨識]           │  Tab: 課程名                        │
-│  ┌────────────────────────┐     │       單元名(ID)                     │
-│  │       Camera           │     │       已到 8 / 應到 20               │
-│  └────────────────────────┘     ├────────────────────────────────────┤
-│  ▶ 辨識（手動模式才出現）        │  STU001 陳小明  STU002 林俊傑  ...  │
-└─────────────────────────────────┴────────────────────────────────────┘
+```text
+per_month   → price × 在班學員數
+per_session → price × 在班學員數 × 預估月場次數
+per_class   → price × 在班學員數 × 預估月堂數
 ```
 
-#### 手動 / 自動模式切換
-
-- 預設「手動模式」：不啟動 1 秒掃描 timer，顯示「▶ 辨識」按鈕
-- 按「▶ 辨識」→ 呼叫 `triggerScan()`（`useKioskCheckin` 新增）執行一次辨識
-- 切換為「自動辨識」→ 啟動自動 timer，按鈕隱藏
-
-#### 新增 / 修改檔案
-
-- `src/hooks/useKioskCheckin.ts` — 新增 `manualMode: boolean`（args）與 `triggerScan: () => void`（return）
-- `src/pages/KioskPage.tsx` — 新增 `manualMode` state、`ModeToggle` component、`scanBtn` 樣式
+「在班學員數」= class_students 中 active=true 的數量。
 
 ---
 
-### Task 072｜Kiosk 多 Session Tab 花名冊
+### Task 086｜ClassPricingPage（/class-pricing）
 
-**場景**：同一 Kiosk 同時選取兩個（或多個）session（如兩間教室各自上課）時，右側花名冊需要按 session 分開顯示。
-
-#### 設計
-
-- `RosterStudent` 新增 `sessionKey` / `sessionLabel` / `sessionSubLabel`
-- `StudentRoster` 拆成 `TabBar` + `RosterGrid` 兩層
-- Tab 永遠顯示（即使只有一個 session）以作為課程標題
-
-#### Tab 顯示
-
-- 第 1 行：課程名（班名 or 課程方案名），`1.5rem bold`
-- 第 2 行：單元名(MOD ID) or 時間範圍，`0.85rem`
-- 第 3 行：`已到 N` / `應到 M` 兩個 badge
-
-#### 自動切換 Tab
-
-- 辨識命中（`match` 變更）→ 自動切換到包含該學生的第一個 Tab
-
-#### 新增 / 修改檔案
-
-- `src/pages/KioskPage.tsx` — `RosterStudent` interface 擴充、`StudentRoster`、`RosterGrid`、`activeRosterTab` state + 兩個 useEffect
+- 列出該分校所有班級的目前有效定價
+- 欄位：班級代碼、班級名稱、計費方式、定價、目前人數、預估營收、生效起日、操作
+- 列表底部顯示分校總預估營收
 
 ---
 
-### Task 073｜Kiosk 花名冊一頁呈現
+### Task 087｜新增 / 編輯定價對話框
 
-**問題**：原先 `shell` 使用 `minHeight: 100vh`，頁面可超出視窗高度，造成瀏覽器 scrollbar。
+- 計費方式 dropdown（per_month / per_session / per_class）
+- effectiveFrom（calendar）、effectiveTo（可留空）
+- 同 classId 在同一時間區間僅能有一筆有效定價（uniqueness validation）
 
-#### 改動
+---
 
-| 項目 | 改法 |
-|---|---|
-| **消除 scrollbar** | `shell` 改為 `height: 100vh; overflow: hidden` |
-| **動態欄數** | `numCols = ceil(N / 10)`，上限 12，所有學生一頁完整顯示 |
-| **學生卡片** | 水平排列：學號（灰小，左，`flexShrink:0`）+ 姓名（白粗，右，`flex:1`） |
-| **排列順序** | `localeCompare('zh-Hant-u-co-stroke')`（按筆劃由少到多） |
+### Task 088｜結束定價（end pricing）
+
+- 列表上「結束」按鈕：將該筆 effectiveTo 設為今日
+- 同時可選擇是否立刻新增下一筆生效定價（連續性）
+
+---
+
+# Phase 17｜課程方案模組（Course Program）🚧
+
+## 目標
+
+引入「課程方案 = 期數制 / 套裝課程」獨立於常態班級之外的排課與報名單位。
+
+---
+
+### Task 089｜建立 courses collection 與服務 API
+
+詳見 `SAMS_engineering_spec.md` `courses` schema。
+服務 API：CRUD + listByBranch + listByStatus。
+
+---
+
+### Task 090｜建立 course_modules collection 與服務 API
+
+詳見 schema。每個課程方案可拆成多個模組。
+
+---
+
+### Task 091｜建立 course_sessions collection 與服務 API
+
+每堂實際上課場次。提供批次建立功能（依 startDate / endDate / 週幾 / 時段自動展開）。
+
+---
+
+### Task 092｜建立 course_enrollments collection 與服務 API
+
+學員報名。寫入時驗證：courseId 存在、該課程 status 為 enrolling 或 running、未超過 capacity、學員未重複報名。
+
+---
+
+### Task 093｜建立 course_attendance collection 與服務 API
+
+每堂出席紀錄。結構與 attendance_records 相似，key 為 courseSessionId。
+
+---
+
+### Task 094｜CoursesPage（/courses）
+
+- 列出課程方案（分校 / 狀態 / 期間 filter）
+- 新增 / 編輯 / 複製課程方案
+
+---
+
+### Task 095｜CourseDetailPage（/courses/:courseId）
+
+- Tab 1 課程資訊
+- Tab 2 模組
+- Tab 3 排課（含批次產生）
+- Tab 4 報名清單
+- Tab 5 出席統計
+
+---
+
+### Task 096｜CourseSessionPage（/course-session/:courseSessionId）
+
+點名功能讀寫 `course_attendance`（與 SessionPage 相同 UX，不同 collection）。
+
+---
+
+### Task 097｜Kiosk 支援課程方案場次
+
+- 自動掃描 `sessions` 與 `course_sessions`，取最早一場為當下報到目標
+- 報到寫入時依場次來源寫入 `attendance_records` 或 `course_attendance`
+- 比對範圍：本分校 + 該場次的應到 / 已報名學員
+
+---
+
+### Task 098｜Firestore rules + indexes 補齊
+
+為 5 個新 collection 補上規則與必要 composite indexes（branchId+status、courseId+date 等）。
+
+---
+
+# Phase 18｜學員 Profile 類型 child / adult 🚧
+
+## 目標
+
+支援兒童 / 成人兩種學員類型，各自的專屬欄位。
+
+---
+
+### Task 099｜students 型別與 service 擴充
+
+新增欄位：
+
+```ts
+profileType: 'child' | 'adult',
+gender, birthday, phone, city, district, address, permanentAddress,
+emergencyContactName, emergencyContactPhone, emergencyContactRelation,
+notes,
+childProfile?: { grade, school, parent1, parent2 },
+adultProfile?: { education, graduateSchool, major, company, jobTitle, idNumber },
+```
+
+`createStudent` / `updateStudent` 寫入時驗證 profileType 對應 profile 物件的必填欄位。
+
+---
+
+### Task 100｜StudentFormDialog 條件顯示欄位
+
+- 表單最上方加 profileType radio（child / adult）
+- 切換時動態顯示對應欄位群
+- legacy 欄位 grade / parentName / parentPhone 不再於 UI 出現，只在型別保留以讀取舊資料
+
+---
+
+### Task 101｜StudentsPage 列表欄位調整
+
+- 顯示 `profileType` 標籤（兒童 / 成人）
+- 兒童顯示年級 / 學校
+- 成人顯示公司 / 職稱
+- 搜尋條件：姓名、家長名稱（child）、公司（adult）
+
+---
+
+### Task 102｜StudentDetailPage 顯示對應 profile
+
+- 兒童 Tab：年級、就讀學校、家長 1 / 家長 2
+- 成人 Tab：學歷、畢業學校、科系、公司、職稱
+- 共用 Tab：基本資料、地址、緊急聯絡人
+
+---
+
+### Task 103｜向下相容 lazy migration
+
+- 讀取時：若文件無 profileType，視為 child；childProfile.grade 取 fallback `students.grade`
+- 寫入時（用戶下次 save）：補齊 profileType 與對應 profile 物件
+- 不做大批 backfill，不做硬性遷移
 
 ---
 
 # 建議開發順序總表
 
-| Phase | 名稱 | 優先度 |
-|---|---|---|
-| Phase 0 | 專案初始化 | P0 |
-| Phase 1 | 登入與權限 | P0 |
-| Phase 2 | 多分校基礎資料 | P0 |
-| Phase 3 | 學生資料管理 | P0 |
-| Phase 4 | 班級與排課 | P0 |
-| Phase 5 | 每日場次產生 | P0 |
-| Phase 6 | 手動報到 MVP | P0 |
-| Phase 7 | Kiosk 畫面 | P1 |
-| Phase 8 | 人臉照片註冊 | P1 |
-| Phase 9 | 人臉報到 | P1 |
-| Phase 10 | HQ Dashboard | P1 |
-| Phase 11 | 請假模組 | P1 |
-| Phase 12 | 通知模組 | P2 |
-| Phase 13 | 報表分析 | P2 |
-| Phase 14 | 系統設定 | P2 |
-| Phase 15 | 測試與上線 | P0 |
-| Phase 16 | MVP 後續優化（Task 045-066：選項管理、講師、地址、班級擴充、定價、期間 filter） | P2 |
-| Phase 17 | 課程方案模組（Task 067-070：CRS/MOD/CS 三層、Dashboard 整合、名稱顯示、排課清單） | P1 |
-| Phase 18 | Kiosk UI 改版（Task 071-073：左右分割、手動辨識、多 Session Tab、一頁花名冊） | P1 |
+| Phase | 名稱 | 優先度 | 狀態 |
+|---|---|---|---|
+| Phase 0 | 專案初始化 | P0 | ✅ |
+| Phase 1 | 登入與權限 | P0 | ✅ |
+| Phase 2 | 多分校基礎資料 | P0 | ✅ |
+| Phase 3 | 學生資料管理 | P0 | ✅ |
+| Phase 4 | 班級與排課 | P0 | ✅ |
+| Phase 5 | 每日場次產生 | P0 | ✅ |
+| Phase 6 | 手動報到 MVP | P0 | ✅ |
+| Phase 7 | Kiosk 畫面 | P1 | ✅ |
+| Phase 8 | 人臉照片註冊 | P1 | ✅ |
+| Phase 9 | 人臉報到 | P1 | ✅ |
+| Phase 10 | HQ Dashboard | P1 | ✅ |
+| §M1 | 進階功能擴充 045–066 | P0 | ✅ |
+| Phase 11 | 請假模組 | P1 | 🚧 |
+| Phase 16 | 班級定價模組 | P1 | 🚧 |
+| Phase 18 | 學員 Profile 類型 | P1 | 🚧 |
+| Phase 12 | 通知模組 | P2 | 🚧 |
+| Phase 13 | 報表分析 | P2 | 🚧 |
+| Phase 14 | 系統設定（剩餘） | P2 | 🚧 |
+| Phase 17 | 課程方案模組 | P2 | 🚧 |
+| Phase 15 | 測試與上線 | P0 | 🚧 |
 
 ---
 

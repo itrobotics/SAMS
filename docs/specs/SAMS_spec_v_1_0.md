@@ -74,7 +74,7 @@ Face Recognition: Python Module API
 |---|---|
 | M01 | 使用者登入與權限模組 |
 | M02 | 多分校管理模組 |
-| M03 | 學生主檔模組 |
+| M03 | 學生主檔模組（含 Profile 類型：兒童 / 成人） |
 | M04 | 班級與課程模組 |
 | M05 | 每日場次產生模組 |
 | M06 | 報到管理模組 |
@@ -84,7 +84,8 @@ Face Recognition: Python Module API
 | M10 | 通知模組 |
 | M11 | 報表分析模組 |
 | M12 | 系統設定模組 |
-| M13 | 班級定價表模組 |
+| M13 | 班級定價模組 |
+| M14 | 課程方案模組（Course Program） |
 
 ---
 
@@ -160,63 +161,88 @@ Face Recognition: Python Module API
 
 ## M03 學生主檔模組
 
-### 學員類型（profileType）
+學員（student）有兩種 Profile 類型：
 
-學員分兩類：
+- **child**：學齡前 / 國中小 / 高中職 兒童或青少年
+- **adult**：成人 / 在職 / 在學大學以上 / 企業學員
 
-- **child（小朋友）**：補習班、安親班、才藝班的學齡學生
-- **adult（成人）**：企業教育中心、職訓課程的成人學員
+兩種類型共用核心欄位（studentId、name、branchId、phone、address、status…），各自擁有專屬欄位。
 
-兩者**共用**所有出席、班級、課程方案功能；**僅基本資料欄位不同**。
-
-舊資料若無 `profileType`，讀取端一律視為 `child`。
-
-### 欄位
+### 共用欄位
 
 ```json
 {
   "studentId": "S001",
-  "name": "王小明",
   "branchId": "anhe",
+  "name": "王小明",
   "profileType": "child",
-
-  // 小朋友專屬（profileType === "child"）
-  "childProfile": {
-    "grade": "小三",
-    "school": "仁愛國小",
-    "parent1Name": "王媽媽",
-    "parent1Phone": "09xx",
-    "parent1Email": "...",
-    "parent2Name": "...",
-    "parent2Phone": "..."
-  },
-
-  // 成人專屬（profileType === "adult"）
-  "adultProfile": {
-    "birthDate": "1990-05-12",
-    "education": "大學",
-    "graduateSchool": "台灣大學",
-    "major": "資訊工程",
-    "company": "艾鍗科技",
-    "jobTitle": "工程師",
-    "idNumber": "A123456789"
-  },
-
+  "gender": "male",
+  "birthday": "2014-03-21",
+  "phone": "09xx",
+  "city": "台北市",
+  "district": "大安區",
+  "address": "敦化南路一段...",
+  "permanentAddress": "同上",
+  "emergencyContactName": "王媽媽",
+  "emergencyContactPhone": "09xx",
+  "emergencyContactRelation": "母",
+  "notes": "...",
   "status": "active"
 }
 ```
 
-兒童 `grade` 下拉值：`小一`/`小二`/.../`小六`/`國一`/`國二`/`國三`/`高一`/`高二`/`高三`。
-成人 `education` 下拉值：`高中/職`/`專科`/`大學`/`碩士`/`博士`。
+### child 專屬欄位（profileType = "child"）
+
+```json
+{
+  "childProfile": {
+    "grade": "小三",
+    "school": "敦化國小",
+    "parent1": {
+      "name": "王爸爸",
+      "phone": "09xx",
+      "relation": "父",
+      "lineId": "..."
+    },
+    "parent2": {
+      "name": "王媽媽",
+      "phone": "09xx",
+      "relation": "母",
+      "lineId": "..."
+    }
+  }
+}
+```
+
+### adult 專屬欄位（profileType = "adult"）
+
+```json
+{
+  "adultProfile": {
+    "education": "大學",
+    "graduateSchool": "台灣大學",
+    "major": "資訊工程",
+    "company": "ABC 公司",
+    "jobTitle": "工程師",
+    "idNumber": "A12345...（加密儲存或僅在報表權限可讀）"
+  }
+}
+```
+
+### 向下相容規則
+
+- 既有不帶 `profileType` 的學員資料，預設視為 `child`
+- 既有舊欄位 `grade` / `parentName` / `parentPhone` 仍可讀；UI 顯示時優先讀 `childProfile.*`，缺失才 fallback 舊欄位
+- Migration 採取 lazy 模式：學員下次被編輯時補齊 `profileType` 與對應 profile 物件，不做大批次 backfill
 
 ### 功能
 
-- 新增學生（需先選擇學員類型，再填寫對應欄位）
-- 修改學生（可切換類型，切換時清空原 profile 資料）
-- 停用學生
-- 搜尋學生（依姓名 / 學號 / 家長 / 公司 / 電話）
-- 篩選學員類型（全部 / 小朋友 / 成人）
+- 新增學生（建立時即選擇 profileType）
+- 修改學生（在 [編輯學生] 表單依 profileType 顯示對應欄位群）
+- 停用 / 永久刪除學生
+- 搜尋學生（姓名、學員編號、家長姓名 / 公司）
 - 轉分校
+- 上課記錄查詢（後續 Phase 補上）
 
 ---
 
@@ -348,20 +374,75 @@ Firestore
 
 ## M08 請假模組
 
+### 資料結構
+
+`leave_requests` collection：
+
 ```json
 {
+  "leaveId": "L0001",
   "studentId": "S001",
+  "studentName": "王小明",
+  "branchId": "anhe",
   "sessionId": "20260427_C001",
+  "classId": "C001",
+  "className": "Scratch 初階班",
+  "sessionDate": "2026-04-27",
   "reason": "感冒",
-  "status": "approved"
+  "status": "pending",
+  "createdBy": "U001",
+  "createdAt": "timestamp",
+  "approvedBy": null,
+  "approvedAt": null,
+  "rejectedReason": null
 }
 ```
 
-### 功能
+`status`：`pending` | `approved` | `rejected` | `cancelled`。
 
-- 家長請假
-- 行政登錄
-- 補課追蹤
+### 服務 API（src/services/leaves.ts）
+
+```ts
+createLeaveRequest(input): Promise<LeaveDoc>
+approveLeaveRequest(leaveId, operatorId): Promise<void>
+rejectLeaveRequest(leaveId, operatorId, reason): Promise<void>
+cancelLeaveRequest(leaveId, operatorId): Promise<void>
+listLeavesByStudent(studentId, range?): Promise<LeaveDoc[]>
+listLeavesBySession(sessionId): Promise<LeaveDoc[]>
+listPendingLeaves(branchId?): Promise<LeaveDoc[]>
+```
+
+審核行為：
+
+- `approve`：將 `attendance_records` 對應的 record 狀態由 `SCHEDULED` 改為 `LEAVE`，並寫回 `leaveId` 連結欄位（`attendance_records.leaveId`）。
+- `reject`：不動 attendance；保留紀錄供後續查詢。
+- `cancel`：學員 / 家長主動撤回；若先前已 approve 過，需同步將 attendance 由 `LEAVE` 還原為 `SCHEDULED`（限該場次尚未開始）。
+
+### UI 流程
+
+#### SessionPage（班級報到頁）
+
+- 每位學生列在「操作」欄新增「請假」按鈕。
+- 點擊後彈出表單：原因（textarea）、是否需審核（branch_admin / hq_admin 直接 approved；teacher / staff 預設 pending）。
+- 送出後即時更新該學生狀態為 `LEAVE`（若已 approved）或在列表上加 `pending` 標籤。
+
+#### StudentDetailPage（學生詳細頁）
+
+- 新增「請假紀錄」分頁，列出該學員所有 `leave_requests`：
+  - 日期 / 班級 / 場次 / 原因 / 狀態 / 審核人 / 操作（cancel / approve / reject）
+- 行政可在此頁建立未來場次的預先請假（指定 sessionId）。
+
+#### LeavesPage（總覽，後續 Phase 補）
+
+- 分校 / HQ 角色可查所有請假，含 pending 待審。
+- Filter：分校、學生、日期區間、狀態。
+
+### 權限
+
+- 家長端（後續 Phase）：可建立 pending leave。
+- 老師 / 行政：可建立並 approve / reject 自己分校的學生。
+- HQ：跨分校檢視與審核。
+- attendance_records 的狀態變更必須透過服務 API，不允許 client 直接寫 `status: 'LEAVE'`，以保留審核軌跡。
 
 ---
 
@@ -423,49 +504,215 @@ Firestore
 
 ---
 
-## M13 班級定價表模組
+## M13 班級定價模組
 
-### 用途
+### 目的
 
-維護各班級的「每人費用」與計費方式，並依當前班級人數即時估算營收。屬營運分析輔助模組（不參與排課 / 報到流程）。
+為每個班級記錄定價與計費方式，作為營收估算與後續開立收費單據的基礎。
 
-### 欄位
+### 資料結構
+
+`class_pricing` collection：
 
 ```json
 {
-  "pricingId": "PR000001",
+  "pricingId": "P0001",
   "classId": "C001",
   "branchId": "anhe",
-  "className": "Scratch 初階班",
-  "price": 3000,
-  "priceType": "per_class | per_month | per_session",
-  "notes": "",
-  "active": true
+  "price": 4500,
+  "priceType": "per_month",
+  "currency": "TWD",
+  "effectiveFrom": "2026-04-01",
+  "effectiveTo": null,
+  "notes": "...",
+  "createdBy": "U001",
+  "createdAt": "timestamp",
+  "updatedAt": "timestamp"
 }
 ```
 
-> `className` 為 denormalized 欄位（從 classes 寫入時複製進來），列表免再 join。
+`priceType`：
 
-### 計費方式
+- `per_month`：每月定額（不論上幾堂）
+- `per_session`：每班次（一個 session 算一次）
+- `per_class`：每堂（同 per_session 但語意指單堂課，跨多 session 班級用）
 
-| priceType | 顯示 | 說明 |
-|---|---|---|
-| `per_class` | 每班次 | 整個班次（一期）一筆費用 |
-| `per_month` | 每月 | 每人每月收費 |
-| `per_session` | 每堂 | 每人每堂收費 |
+`effectiveFrom` 必填；`effectiveTo` 為 null 表示目前仍有效。同一 classId 在同一時間區間僅能有一筆有效定價。
 
-### 功能
+### 服務 API（src/services/classPricing.ts）
 
-- 新增 / 編輯 / 停用定價（同一班級可有多筆，例如優惠價、舊價）
-- 依分校、班名、啟用狀態篩選
-- 列表顯示「目前人數 × 定價 = 預估營收」與啟用中合計
-- 預估營收 = `price × 該班 class_students.active 人數`（client 端計算，不寫回）
+```ts
+createClassPricing(input): Promise<ClassPricingDoc>
+updateClassPricing(pricingId, patch): Promise<void>
+getActivePricing(classId, asOf?: Date): Promise<ClassPricingDoc | null>
+listPricingByBranch(branchId): Promise<ClassPricingDoc[]>
+```
 
-### 權限
+### 營收計算邏輯
 
-- `hq_admin`：所有分校
-- `branch_admin`：本分校
-- 其他角色：無導覽入口（路由也預設要登入）
+每個班級的「預估營收」依 priceType 不同：
+
+```text
+per_month   → price × 目前在班學員人數                （估每月收入）
+per_session → price × 目前在班學員人數 × 預估月場次數
+per_class   → price × 目前在班學員人數 × 預估月堂數
+```
+
+「在班人數」= `class_students` 中該 classId 且 active=true 的學員數。
+
+### ClassPricingPage（/class-pricing）
+
+- 顯示分校所有班級的目前有效定價
+- 欄位：班級代碼、班級名稱、計費方式、定價、目前人數、預估營收、生效起日、操作
+- 可新增 / 編輯 / 結束（將 effectiveTo 設為今日，並可同時新增下一筆生效定價）
+- 列表底部顯示分校總預估營收
+- 已從 spec 移除「生效起始月份 YYYY-MM / 生效結束月份留白」的舊設計，改用 effectiveFrom / effectiveTo 日期欄位
+
+---
+
+## M14 課程方案模組（Course Program）
+
+### 目的
+
+「班級（class）」是常態排課單位，「課程方案（course）」是時段制 / 期數制的套裝課程：
+
+- 一個課程方案有固定起訖日、固定堂數、可包含多個模組（modules）
+- 學員報名「課程方案」而不是「班級」
+- 每堂課（course_session）獨立排課並記點名
+
+適用情境：寒暑期班、密集班、企業內訓、檢定考衝刺班、營隊。
+
+### 資料結構
+
+#### courses
+
+```json
+{
+  "courseId": "CR0001",
+  "branchId": "anhe",
+  "name": "2026 暑期 Python 密集班",
+  "courseType": "Python 程式",
+  "summary": "從零開始 60 小時掌握 Python",
+  "startDate": "2026-07-01",
+  "endDate": "2026-08-15",
+  "totalHours": 60,
+  "totalSessions": 30,
+  "capacity": 20,
+  "tuition": 18000,
+  "tuitionType": "per_program",
+  "instructorIds": ["T001", "T003"],
+  "classroom": "101",
+  "status": "draft",
+  "createdAt": "timestamp"
+}
+```
+
+`status`：`draft` | `enrolling` | `running` | `finished` | `cancelled`。
+`tuitionType`：`per_program`（整期一次收）| `per_module`。
+
+#### course_modules
+
+一個課程方案可拆成多個模組（例如「基礎篇 / 專題篇」）：
+
+```json
+{
+  "moduleId": "CM0001",
+  "courseId": "CR0001",
+  "name": "基礎篇",
+  "orderIndex": 1,
+  "totalSessions": 12,
+  "totalHours": 24,
+  "moduleTuition": 8000
+}
+```
+
+#### course_sessions
+
+每堂實際上課場次（取代 sessions collection 在課程方案下的角色，獨立 collection 以區分常態班 vs 課程方案）：
+
+```json
+{
+  "courseSessionId": "CRS0001",
+  "courseId": "CR0001",
+  "moduleId": "CM0001",
+  "branchId": "anhe",
+  "date": "2026-07-01",
+  "startTime": "09:00",
+  "endTime": "11:00",
+  "instructorId": "T001",
+  "classroom": "101",
+  "topic": "第 1 講：環境安裝與 Hello World",
+  "status": "waiting"
+}
+```
+
+#### course_enrollments
+
+學員報名紀錄：
+
+```json
+{
+  "enrollmentId": "EN0001",
+  "courseId": "CR0001",
+  "studentId": "S001",
+  "branchId": "anhe",
+  "enrolledAt": "timestamp",
+  "tuitionPaid": 18000,
+  "paymentStatus": "paid",
+  "status": "active",
+  "moduleIds": ["CM0001", "CM0002"],
+  "notes": "..."
+}
+```
+
+`status`：`active` | `withdrawn` | `completed`。
+`paymentStatus`：`unpaid` | `partial` | `paid` | `refunded`。
+
+#### course_attendance
+
+每堂出席紀錄（與 attendance_records 結構相似，但 key 為 courseSessionId）：
+
+```json
+{
+  "recordId": "CRA0001",
+  "courseSessionId": "CRS0001",
+  "courseId": "CR0001",
+  "studentId": "S001",
+  "studentName": "王小明",
+  "status": "CHECKED_IN",
+  "method": "FACE",
+  "confidence": 0.91,
+  "checkinTime": "timestamp",
+  "operatorId": "U001"
+}
+```
+
+### 頁面
+
+#### CoursesPage（/courses）
+
+- 列出所有課程方案（分校 filter、狀態 filter、期間 filter）
+- 欄位：課程代碼、名稱、起訖日、總堂數、報名人數 / 容量、狀態
+- 新增 / 編輯 / 複製課程方案
+
+#### CourseDetailPage（/courses/:courseId）
+
+- Tab 1 課程資訊：基本欄位、總堂數、講師
+- Tab 2 模組（modules）：列出所有 course_modules
+- Tab 3 排課（sessions）：列出所有 course_sessions，支援批次產生
+- Tab 4 報名清單：列出 course_enrollments、可加入 / 退費 / 完成
+- Tab 5 出席統計：每位學員的 attended / total、出席率
+
+#### CourseSessionPage（/course-session/:courseSessionId）
+
+- 同 SessionPage 的點名功能但讀寫 `course_attendance`
+- 支援手動報到 / 請假 / 遲到 / 重設
+
+#### Kiosk 整合
+
+- Kiosk 自動找到「目前進行中或即將開始」的場次時，需同時掃描 `sessions`（常態班）與 `course_sessions`（課程方案），取最早一場為當下報到目標。
+- 報到寫入時依場次來源寫到 `attendance_records` 或 `course_attendance`。
+- 報到比對範圍同樣限制：本分校 + 該場次的應到 / 已報名學員。
 
 ---
 
@@ -474,14 +721,22 @@ Firestore
 ```text
 branches
 users
-students
+students                 # 含 profileType: child | adult
+instructors
 classes
 class_students
-class_pricing
 sessions
 attendance_records
 face_profiles
+face_checkin_attempts
 leave_requests
+class_pricing
+courses
+course_modules
+course_sessions
+course_enrollments
+course_attendance
+app_options
 settings
 logs
 ```

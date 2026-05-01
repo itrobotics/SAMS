@@ -36,9 +36,6 @@ Python Face Recognition API
 /kiosk/:branchId
 /students
 /classes
-/class-pricing
-/instructors
-/instructor-schedule
 /reports
 /settings
 ```
@@ -74,63 +71,56 @@ Python Face Recognition API
 
 ## students
 
-學員分兩種類型：`child`（小朋友）與 `adult`（成人）。
-兩者共用出席、班級、課程方案功能；僅基本資料欄位不同。
-舊資料無 `profileType` 時，讀取端視為 `child`。
-
 ```ts
 {
   studentId: string,
   branchId: string,
   name: string,
-  gender: 'male' | 'female' | 'other',
-  birthday: string,                       // YYYY-MM-DD（共用，向下相容）
+  profileType: 'child' | 'adult',           // 預設 child（向下相容）
+  gender?: 'male' | 'female' | 'other',
+  birthday?: string,                         // YYYY-MM-DD
+  phone?: string,
+  city?: string,
+  district?: string,
+  address?: string,
+  permanentAddress?: string,                 // 戶籍地址 (可填「同上」)
+  emergencyContactName?: string,
+  emergencyContactPhone?: string,
+  emergencyContactRelation?: '父' | '母' | '兄弟姐妹' | '其他',
+  notes?: string,
+  active: boolean,
+  createdAt: timestamp,
 
-  profileType: 'child' | 'adult',         // 預設 'child'
+  // legacy fields (deprecated, fallback only)
+  grade?: string,
+  parentName?: string,
+  parentPhone?: string,
 
-  // 小朋友專屬
+  // child only
   childProfile?: {
-    grade: string,                         // '小一'..'高三'
-    school: string,
-    parent1Name: string,
-    parent1Phone: string,
-    parent1Email?: string,
-    parent2Name?: string,
-    parent2Phone?: string
+    grade: string,
+    school?: string,
+    parent1?: { name: string, phone: string, relation: string, lineId?: string },
+    parent2?: { name: string, phone: string, relation: string, lineId?: string },
   },
 
-  // 成人專屬
+  // adult only
   adultProfile?: {
-    birthDate?: string,                    // YYYY-MM-DD
-    education?: string,                    // '高中/職' | '專科' | '大學' | '碩士' | '博士'
+    education?: string,
     graduateSchool?: string,
     major?: string,
     company?: string,
     jobTitle?: string,
-    idNumber?: string                      // 身分證字號（職訓用）
-  },
-
-  // 向下相容欄位（child 類型仍會同步寫入頂層）
-  grade: string,
-  parentName: string,
-  parentPhone: string,
-
-  // 通訊 / 戶籍地址、緊急聯絡人、備註
-  mailingCity: string,
-  mailingDistrict: string,
-  mailingAddress: string,
-  registeredAddressSameAsMailing: boolean,
-  registeredCity: string,
-  registeredDistrict: string,
-  registeredAddress: string,
-  emergencyContactName: string,
-  emergencyContactRelation: string,
-  notes: string,
-
-  active: boolean,
-  createdAt: timestamp
+    idNumber?: string,                       // PII：寫入前考慮加密 / 限角色讀取
+  }
 }
 ```
+
+**向下相容規則：**
+
+- 若文件無 `profileType`，視為 `child`。
+- UI 讀取年級 / 家長資訊時優先讀 `childProfile.*`；缺失才 fallback 至最上層 legacy 欄位。
+- Migration 採 lazy 模式：學員下次被編輯儲存時補上 `profileType` 與對應 profile 物件，不做大批 backfill。
 
 ## classes
 
@@ -194,27 +184,151 @@ Python Face Recognition API
 }
 ```
 
+## leave_requests
+
+```ts
+{
+  leaveId: string,
+  studentId: string,
+  studentName: string,
+  branchId: string,
+  sessionId: string,
+  classId: string,
+  className: string,
+  sessionDate: string,                        // YYYY-MM-DD
+  reason: string,
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled',
+  createdBy: string,
+  createdAt: timestamp,
+  approvedBy: string | null,
+  approvedAt: timestamp | null,
+  rejectedReason: string | null,
+}
+```
+
+approve 時將對應 `attendance_records.status` 由 `SCHEDULED` 改為 `LEAVE`，並寫回連結 `attendance_records.leaveId`。
+
 ## class_pricing
 
 ```ts
 {
-  pricingId: string,                                       // 自動產生 PRnnnnnn（6 位）
+  pricingId: string,
   classId: string,
   branchId: string,
-  className: string,                                        // denormalized
-  price: number,                                            // TWD，每人費用
-  priceType: 'per_class' | 'per_month' | 'per_session',
-  notes: string,
-  active: boolean,
+  price: number,
+  priceType: 'per_month' | 'per_session' | 'per_class',
+  currency: 'TWD',
+  effectiveFrom: string,                      // YYYY-MM-DD
+  effectiveTo: string | null,                 // null = 仍有效
+  notes?: string,
+  createdBy: string,
   createdAt: timestamp,
-  createdBy: string                                         // user.userId
+  updatedAt: timestamp,
 }
 ```
 
-> 同一 classId 可有多筆（例如優惠價、舊價）；以 `active` 控制是否納入營收估算。
-> 預估營收 = `price × 該班 class_students.active 人數`，由 client 計算，不寫回 Firestore。
+同 classId 在同一時間區間僅能有一筆有效定價。
 
-Firestore rules 在 MVP 階段沿用「登入即可讀寫」；分校隔離由 client 端 `where('branchId', 'in', user.branchIds)` 控制。
+## courses
+
+```ts
+{
+  courseId: string,
+  branchId: string,
+  name: string,
+  courseType: string,                          // 來源：app_options.courseTypes
+  summary?: string,
+  startDate: string,                           // YYYY-MM-DD
+  endDate: string,
+  totalHours: number,
+  totalSessions: number,
+  capacity: number,
+  tuition: number,
+  tuitionType: 'per_program' | 'per_module',
+  instructorIds: string[],
+  classroom?: string,
+  status: 'draft' | 'enrolling' | 'running' | 'finished' | 'cancelled',
+  createdAt: timestamp,
+}
+```
+
+## course_modules
+
+```ts
+{
+  moduleId: string,
+  courseId: string,
+  name: string,
+  orderIndex: number,
+  totalSessions: number,
+  totalHours: number,
+  moduleTuition?: number,
+}
+```
+
+## course_sessions
+
+```ts
+{
+  courseSessionId: string,
+  courseId: string,
+  moduleId?: string,
+  branchId: string,
+  date: string,                                 // YYYY-MM-DD
+  startTime: string,
+  endTime: string,
+  instructorId: string,
+  classroom?: string,
+  topic?: string,
+  status: 'waiting' | 'running' | 'finished',
+}
+```
+
+## course_enrollments
+
+```ts
+{
+  enrollmentId: string,
+  courseId: string,
+  studentId: string,
+  branchId: string,
+  enrolledAt: timestamp,
+  tuitionPaid: number,
+  paymentStatus: 'unpaid' | 'partial' | 'paid' | 'refunded',
+  status: 'active' | 'withdrawn' | 'completed',
+  moduleIds?: string[],                         // 部分模組報名時用
+  notes?: string,
+}
+```
+
+## course_attendance
+
+```ts
+{
+  recordId: string,
+  courseSessionId: string,
+  courseId: string,
+  studentId: string,
+  studentName: string,
+  status: 'SCHEDULED' | 'CHECKED_IN' | 'LATE' | 'LEAVE' | 'ABSENT',
+  method: null | 'FACE' | 'MANUAL',
+  confidence: null | number,
+  checkinTime: null | timestamp,
+  operatorId?: string,
+}
+```
+
+## app_options
+
+```ts
+{
+  optionId: string,
+  category: 'relationships' | 'courseTypes' | string,
+  value: string,
+  orderIndex: number,
+  active: boolean,
+}
+```
 
 ---
 
@@ -488,4 +602,47 @@ VITE_FIREBASE_MEASUREMENT_ID
 - `.env` 永遠不可 commit；切換客戶時請重新複製
 - 不同客戶的 Firestore rules / Storage rules / indexes 同樣以該客戶專案為部署目標
 - 程式碼層面不需要區分客戶；客戶間的差異只能透過資料（settings collection 等）表達，不可寫死在 code 裡
+- 切勿在 codebase 引入 `if (customerId === ...)` 之類的客戶判斷式
+
+### 14.5 Firebase CLI 專案別名
+
+`.firebaserc` 可在同一個 working copy 維護多個別名，方便切換：
+
+```json
+{
+  "projects": {
+    "default": "ithink-sams",
+    "ice": "ithink-sams",
+    "demo": "sams-demo-xxxxx"
+  }
+}
+```
+
+部署時：
+
+```bash
+firebase deploy --only hosting --project ice
+firebase deploy --only hosting --project demo
+```
+
+**重點：** `.firebaserc` 的別名只決定「部署到哪個 Firebase 專案」，client-side 連線目標仍由 `.env` 的 `VITE_FIREBASE_*` 決定。兩者必須對齊（同一客戶的 .firebaserc + .env），否則會出現「程式碼指向 A、實際資料在 B」的偏差。
+
+### 14.6 首次部署檢查表
+
+新客戶上線前確認：
+
+- [ ] Firebase 專案已啟用 Firestore（Native mode）
+- [ ] Firebase 專案已啟用 Authentication（Email/Password provider）
+- [ ] 若會用到人臉照片：Firebase Storage 已點 Get Started
+- [ ] Firebase 專案已啟用 Hosting
+- [ ] `.env` 已填入該客戶的 7 個 `VITE_FIREBASE_*` 變數
+- [ ] `.firebaserc` 已加入該客戶 alias
+- [ ] `firestore.rules` 已 deploy（`--only firestore:rules`）
+- [ ] `storage.rules` 已 deploy（若 Storage 已啟用）
+- [ ] `firestore.indexes.json` 已 deploy
+- [ ] `npm run build` 成功，bundle 含正確的 projectId
+- [ ] `firebase deploy --only hosting` 成功
+- [ ] Hosting URL 可開啟並進入登入頁
+- [ ] 已透過 seed script 建立首位 HQ_ADMIN 帳號
+- [ ] HQ_ADMIN 可登入並建立第一個分校 / 班級 / 學生
 
